@@ -26,9 +26,13 @@
 #   crash reports (a Zig panic raised as a Windows exception) with their stack walk on aarch64
 #   too, ghostty.exe /buildinfo, a stats overlay on the inspector key, drawn once per paint,
 #   stderr that never blocks the window, and the build in the window title.
+#   r20261122.8: r20261122.7 plus Ghostty's themes, shell integration and terminfo in share/
+#   beside ghostty.exe, PowerShell as the default shell (pwsh.exe when installed, else Windows
+#   PowerShell, else cmd.exe), the stats on a named pipe with ghostty.exe /stats, and the host
+#   split into modules.
 # ghostty-base: the upstream commit the pick sits on. The version column names the upstream
 #   branch, so a test build of another commit finds its own base on it.
 #
 # name          version                url                                                                commit
-ghostty         1.4.1-dev+r20261122.7  git+https://github.com/congzhangzh/ghostty.git#release-20261122.7  c78ac0890ecabd2c9f9cea6b5bdafc620e2affe3
+ghostty         1.4.1-dev+r20261122.8  git+https://github.com/congzhangzh/ghostty.git#release-20261122.8  d65cd77ef993c8622476d69dd3f6fa434e311575
 ghostty-base    main                   git+https://github.com/ghostty-org/ghostty.git#main                11ed660d99fd0dd8dadcaf456db31b71f0f21beb
