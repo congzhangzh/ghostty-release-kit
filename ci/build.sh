@@ -8,7 +8,9 @@
 #   <out>/ghostty-<version>-windows-<arch>.zip   ghostty-<version>-windows-<arch>/ghostty.exe,
 #                                                 BUILDINFO.txt, LICENSE, README.txt, and share/
 #                                                 (themes, shell integration, terminfo) when the
-#                                                 source has windows/resources.sh
+#                                                 source has windows/resources.sh, and Microsoft's
+#                                                 conpty.dll, OpenConsole.exe and their
+#                                                 THIRD-PARTY-NOTICES.txt when it side-loads them
 # and <out>/SHA256SUMS over the zips. Needs zig (the version build.zig.zon asks for) and zip.
 set -euo pipefail
 src=$(cd "$1" && pwd) version=$2 out=$3
@@ -18,6 +20,19 @@ mkdir -p "$out"
 out=$(cd "$out" && pwd)
 work=$out/work
 kit=$(cd "$(dirname "$0")/.." && pwd)
+
+# Microsoft's ConPTY, pinned in sources.lock (name version url sha256:<hex>), for a source that
+# side-loads it (src/os/conpty.zig): fetched once, checked, its files left unmodified.
+conpty=
+if [ -f "$src/src/os/conpty.zig" ]; then
+	pin() { awk -v c="$1" '$1 == "conpty" { print $c; exit }' "$kit/sources.lock"; }
+	conpty=$work/conpty-$(pin 2).nupkg
+	[ -n "$(pin 3)" ] || { echo "::error::sources.lock has no conpty line" >&2; exit 1; }
+	mkdir -p "$work"
+	[ -f "$conpty" ] || curl -fsSL --retry 3 -o "$conpty" "$(pin 3)"
+	echo "$(pin 4 | sed 's/^sha256://')  $conpty" | sha256sum -c --quiet - ||
+		{ echo "::error::$conpty differs from the SHA-256 in sources.lock" >&2; exit 1; }
+fi
 
 [ -x "$src/windows/build.sh" ] || { echo "::error::$src has no windows/build.sh: not a Windows-capable Ghostty" >&2; exit 1; }
 
@@ -44,6 +59,11 @@ for arch in "$@"; do
 	cp "$work/host-$arch/ghostty.exe" "$pkg/"
 	# Ghostty's resources beside ghostty.exe (share/terminfo is what the core looks for).
 	if [ -x "$src/windows/resources.sh" ]; then "$src/windows/resources.sh" "$work/lib-$arch" "$pkg"; fi
+	if [ -n "$conpty" ]; then
+		case $arch in x86_64) nu=x64 ;; aarch64) nu=arm64 ;; esac
+		unzip -q -o -j "$conpty" "runtimes/win-$nu/native/conpty.dll" "build/native/runtimes/$nu/OpenConsole.exe" -d "$pkg"
+		cp "$kit/ci/THIRD-PARTY-NOTICES.txt" "$pkg/"
+	fi
 	if [ -f "$work/host-$arch/BUILDINFO.txt" ]; then cp "$work/host-$arch/BUILDINFO.txt" "$pkg/"; fi
 	cp "$src/LICENSE" "$pkg/LICENSE"
 	sed -e "s/@VERSION@/$version/g" -e "s/@ARCH@/$arch/g" "$kit/ci/README.txt" > "$pkg/README.txt"

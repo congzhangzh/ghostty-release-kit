@@ -18,6 +18,11 @@ whose names have a colon are left out: Windows can't hold such a file name), or 
 under %LOCALAPPDATA%\ghostty\themes. Keep the share folder beside ghostty.exe: it also has
 Ghostty's shell integration for bash, zsh, fish, elvish and nushell (not yet tried on Windows).
 
+conpty.dll and OpenConsole.exe beside ghostty.exe are Microsoft's console host (MIT, see
+THIRD-PARTY-NOTICES.txt): ghostty.exe runs the shell in it, so what programs write (mouse modes,
+bracketed paste, the kitty keyboard protocol, graphics, the title, OSC 52) reaches it unchanged.
+Without them, or with GHOSTTY_CONPTY=inbox set, it uses Windows' own console, which drops those.
+
 Full screen: F11 or Ctrl+Enter (the whole monitor, no frame, the taskbar hidden); press it
 again to go back. "fullscreen = true" in the config starts every window in full screen.
 
