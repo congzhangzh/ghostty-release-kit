@@ -19,6 +19,13 @@ mouse and wheel, copy and paste, per-monitor DPI. Please report what breaks.
 Not yet: tabs, splits, more than one window, the settings UI. Frames are copied through the
 CPU, so very large windows use more CPU than they should.
 
+To keep a log, start it from cmd.exe, which hands the file itself to ghostty:
+
+    set GHOSTTY_LOG=stderr
+    ghostty.exe 2> ghostty.log
+
+(Windows PowerShell's 2> puts a pipe in between, which can stall ghostty.exe.)
+
 It needs OpenGL 4.3, which any current GPU driver has. In a virtual machine without a GPU
 driver, put Mesa's opengl32.dll (llvmpipe) beside ghostty.exe.
 

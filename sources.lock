@@ -7,9 +7,12 @@
 #   kit builds ghostty-base as a baseline and publishes nothing.)
 #   r20261122.1: the first release: WGL rendering, the embedded Windows platform and frames,
 #   the Win32 host (ghostty.exe), and the Windows fixes they needed (8 commits on main 11ed660).
+#   r20261122.2: r20261122.1 plus a fix found dogfooding on an NVIDIA GPU: the driver reported
+#   every frame's readback as a debug message from its own thread; with stderr on a pipe nobody
+#   drained (Windows PowerShell's 2>) the write blocked and the window stopped responding.
 # ghostty-base: the upstream commit the pick sits on. The version column names the upstream
 #   branch, so a test build of another commit finds its own base on it.
 #
 # name          version                url                                                                commit
-ghostty         1.4.1-dev+r20261122.1  git+https://github.com/congzhangzh/ghostty.git#release-20261122.1  7865c5162a5a13ebfebe7300b70b5ecde50b189a
+ghostty         1.4.1-dev+r20261122.2  git+https://github.com/congzhangzh/ghostty.git#release-20261122.2  7585bea863a1f6bc4d1722f2bf03f97c75c173b3
 ghostty-base    main                   git+https://github.com/ghostty-org/ghostty.git#main                11ed660d99fd0dd8dadcaf456db31b71f0f21beb
