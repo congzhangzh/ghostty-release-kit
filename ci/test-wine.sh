@@ -13,6 +13,7 @@
 set -u
 exe=$1 out=$2
 mkdir -p "$out"
+out=$(cd "$out" && pwd) # absolute: Wine refuses a relative WINEPREFIX
 log=$out/test.log
 : > "$log"
 export WINEPREFIX=${WINEPREFIX:-$out/wineprefix} WINEDEBUG=${WINEDEBUG:--all} WINEDLLOVERRIDES="mscoree,mshtml="
