@@ -30,6 +30,12 @@
 #   beside ghostty.exe, PowerShell as the default shell (pwsh.exe when installed, else Windows
 #   PowerShell, else cmd.exe), the stats on a named pipe with ghostty.exe /stats, and the host
 #   split into modules.
+#   r20261122.9: r20261122.8 plus tabs in the title bar beside Windows' own caption buttons
+#   (Windows 11; GHOSTTY_TITLEBAR=system for the classic bar), Microsoft's ConPTY beside
+#   ghostty.exe so programs' mouse modes, bracketed paste and kitty keyboard reach the shell
+#   unchanged, a translucent stats overlay, the readback's cost in the stats, and
+#   GHOSTTY_PRESENT=swap to draw straight into the window (readback stays the default).
+#   Built and tested on x86_64 first; aarch64 is built when it can be.
 # conpty: Microsoft's console host for pseudoconsoles (conpty.dll + OpenConsole.exe, MIT), the
 #   NuGet package Microsoft.Windows.Console.ConPTY; the commit column is the package's SHA-256.
 #   ci/build.sh puts both files, unmodified, beside ghostty.exe when the source side-loads them
@@ -38,6 +44,6 @@
 #   branch, so a test build of another commit finds its own base on it.
 #
 # name          version                url                                                                commit
-ghostty         1.4.1-dev+r20261122.8  git+https://github.com/congzhangzh/ghostty.git#release-20261122.8  d65cd77ef993c8622476d69dd3f6fa434e311575
+ghostty         1.4.1-dev+r20261122.9  git+https://github.com/congzhangzh/ghostty.git#release-20261122.9  c267f1dd632d594c50d36dc26121a0d4f786ef22
 ghostty-base    main                   git+https://github.com/ghostty-org/ghostty.git#main                11ed660d99fd0dd8dadcaf456db31b71f0f21beb
 conpty          1.25.261109001         https://www.nuget.org/api/v2/package/Microsoft.Windows.Console.ConPTY/1.25.261109001  sha256:3d77f535df848e44225c2a8912ac844fecb23f3057732b639f3034b587496f09
