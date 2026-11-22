@@ -16,7 +16,9 @@ mkdir -p "$out"
 out=$(cd "$out" && pwd) # absolute: Wine refuses a relative WINEPREFIX
 log=$out/test.log
 : > "$log"
-export WINEPREFIX=${WINEPREFIX:-$out/wineprefix} WINEDEBUG=${WINEDEBUG:--all} WINEDLLOVERRIDES="mscoree,mshtml="
+# Keep Ghostty's log and Wine's errors in ghostty.log: a failure on a runner is read from them.
+export WINEPREFIX=${WINEPREFIX:-$out/wineprefix} WINEDEBUG=${WINEDEBUG:-err+all,fixme-all} WINEDLLOVERRIDES="mscoree,mshtml="
+export GHOSTTY_LOG=${GHOSTTY_LOG:-stderr}
 
 say() { echo "$*" | tee -a "$log"; }
 fail() { say "FAIL $*"; cleanup; exit 1; }
@@ -24,6 +26,7 @@ cleanup() { [ -n "${pid:-}" ] && kill "$pid" 2> /dev/null; wineserver -k 2> /dev
 
 [ -n "${DISPLAY:-}" ] || { echo "test-wine.sh: no DISPLAY; run it inside xvfb-run" >&2; exit 2; }
 [ -d "$WINEPREFIX" ] || wineboot -i > "$out/wineboot.log" 2>&1
+echo "# $(wine --version 2> /dev/null)" | tee -a "$log"
 glxinfo -B 2> /dev/null | grep -E "renderer string|core profile version" | sed 's/^/# /' | tee -a "$log"
 
 marker=ghostty-wine-$RANDOM$RANDOM
