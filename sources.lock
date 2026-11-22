@@ -40,6 +40,8 @@
 #   NuGet package Microsoft.Windows.Console.ConPTY; the commit column is the package's SHA-256.
 #   ci/build.sh puts both files, unmodified, beside ghostty.exe when the source side-loads them
 #   (src/os/conpty.zig); its licence and notices are ci/THIRD-PARTY-NOTICES.txt.
+# py-screen: the family line in ghostty.exe's About ("by CZ, an engineer for engineers, near the
+#   magnet"), taken by ci/about.py from SLOGAN in src/py_screen/about.py at this commit.
 # ghostty-base: the upstream commit the pick sits on. The version column names the upstream
 #   branch, so a test build of another commit finds its own base on it.
 #
@@ -47,3 +49,4 @@
 ghostty         1.4.1-dev+r20261122.9  git+https://github.com/congzhangzh/ghostty.git#release-20261122.9  c267f1dd632d594c50d36dc26121a0d4f786ef22
 ghostty-base    main                   git+https://github.com/ghostty-org/ghostty.git#main                11ed660d99fd0dd8dadcaf456db31b71f0f21beb
 conpty          1.25.261109001         https://www.nuget.org/api/v2/package/Microsoft.Windows.Console.ConPTY/1.25.261109001  sha256:3d77f535df848e44225c2a8912ac844fecb23f3057732b639f3034b587496f09
+py-screen       0.1.0                  git+https://github.com/congzhangzh/py-screen.git                    f42a2cdedf6cf25c6941588e331e5e58755912ec

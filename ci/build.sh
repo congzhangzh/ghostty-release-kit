@@ -12,7 +12,8 @@
 #                                                 conpty.dll, OpenConsole.exe and their
 #                                                 THIRD-PARTY-NOTICES.txt when it side-loads them
 # and <out>/SHA256SUMS over the zips. Only x86_64 must build; another architecture that fails
-# is left out and named in <out>/NOT-BUILT. Needs zig (the version build.zig.zon asks for) and zip.
+# is left out and named in <out>/NOT-BUILT. Needs zig (the version build.zig.zon asks for), zip,
+# curl and python3.
 set -euo pipefail
 src=$(cd "$1" && pwd) version=$2 out=$3
 shift 3
@@ -22,17 +23,36 @@ out=$(cd "$out" && pwd)
 work=$out/work
 kit=$(cd "$(dirname "$0")/.." && pwd)
 
+mkdir -p "$work"
+# pin <name> <column>: a field of sources.lock's line for <name> (name version url commit).
+pin() { awk -v n="$1" -v c="$2" '$1 == n { print $c; exit }' "$kit/sources.lock"; }
+
 # Microsoft's ConPTY, pinned in sources.lock (name version url sha256:<hex>), for a source that
 # side-loads it (src/os/conpty.zig): fetched once, checked, its files left unmodified.
 conpty=
 if [ -f "$src/src/os/conpty.zig" ]; then
-	pin() { awk -v c="$1" '$1 == "conpty" { print $c; exit }' "$kit/sources.lock"; }
-	conpty=$work/conpty-$(pin 2).nupkg
-	[ -n "$(pin 3)" ] || { echo "::error::sources.lock has no conpty line" >&2; exit 1; }
-	mkdir -p "$work"
-	[ -f "$conpty" ] || curl -fsSL --retry 3 -o "$conpty" "$(pin 3)"
-	echo "$(pin 4 | sed 's/^sha256://')  $conpty" | sha256sum -c --quiet - ||
+	conpty=$work/conpty-$(pin conpty 2).nupkg
+	[ -n "$(pin conpty 3)" ] || { echo "::error::sources.lock has no conpty line" >&2; exit 1; }
+	[ -f "$conpty" ] || curl -fsSL --retry 3 -o "$conpty" "$(pin conpty 3)"
+	echo "$(pin conpty 4 | sed 's/^sha256://')  $conpty" | sha256sum -c --quiet - ||
 		{ echo "::error::$conpty differs from the SHA-256 in sources.lock" >&2; exit 1; }
+fi
+
+# What ghostty.exe's About and What's new show (ci/about.py), passed to windows/build.sh, which
+# embeds them; a host that doesn't know them ignores both. What's new: this release's paragraph
+# of sources.lock's header (empty for a build of no release). The family line: from the
+# about.py of the py-screen commit sources.lock pins, read as Python syntax, never run.
+whatsnew=$work/whatsnew.txt
+python3 -I "$kit/ci/about.py" whatsnew "$kit/sources.lock" "$version" > "$whatsnew"
+family='' family_from=''
+if [ -n "$(pin py-screen 4)" ]; then
+	repo=$(pin py-screen 3)
+	repo=${repo#git+https://github.com/}
+	repo=${repo%.git}
+	curl -fsSL --retry 3 -o "$work/py-screen-about.py" \
+		"https://raw.githubusercontent.com/$repo/$(pin py-screen 4)/src/py_screen/about.py"
+	family=$(python3 -I "$kit/ci/about.py" family "$work/py-screen-about.py")
+	family_from="py-screen $(pin py-screen 2) @ $(pin py-screen 4 | cut -c1-12)"
 fi
 
 [ -x "$src/windows/build.sh" ] || { echo "::error::$src has no windows/build.sh: not a Windows-capable Ghostty" >&2; exit 1; }
@@ -58,8 +78,10 @@ one() {
 		if [ -n "${REF:-}" ]; then echo "ghostty: ${SRC:-?} $REF @ ${SHA:-?}"; fi
 		if [ -n "${BASE:-}" ]; then echo "upstream base: ghostty-org/ghostty $(git -C "$src" rev-parse "$BASE" 2> /dev/null || echo "$BASE")"; fi
 		if [ -n "${GITHUB_SHA:-}" ]; then echo "kit: ${GITHUB_REPOSITORY:-ghostty-release-kit} @ $GITHUB_SHA"; fi
+		if [ -s "$whatsnew" ]; then echo "whatsnew: r${version##*+r}"; fi
+		if [ -n "$family_from" ]; then echo "family: $family_from"; fi
 	} > "$info"
-	BUILDINFO_FILE=$info "$src/windows/build.sh" "$work/lib-$arch" "$arch" "$work/host-$arch" release
+	WHATSNEW_FILE=$whatsnew FAMILY_LINE=$family BUILDINFO_FILE=$info "$src/windows/build.sh" "$work/lib-$arch" "$arch" "$work/host-$arch" release
 	cp "$work/host-$arch/ghostty.exe" "$pkg/"
 	# Ghostty's resources beside ghostty.exe (share/terminfo is what the core looks for).
 	if [ -x "$src/windows/resources.sh" ]; then "$src/windows/resources.sh" "$work/lib-$arch" "$pkg"; fi
