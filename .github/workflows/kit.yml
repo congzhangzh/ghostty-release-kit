@@ -116,9 +116,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          day=$(date -u +%Y%m%d)
-          n=$(( $(git -C kit ls-remote --tags "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "refs/tags/$day.*" | wc -l) + 1 ))
-          tag=$day.$n
+          # The tag is the pin's own release, <YYYYMMDD>.<N> from a version 1.4.1-dev+r<YYYYMMDD>.<N>,
+          # so it always matches the fork's release-<YYYYMMDD>.<N>, the zip names, BUILDINFO.txt and the
+          # window title, also when a picked release was never published (20261122.6). Counting
+          # the day's tags is kept only for a version without +r (none is pinned so far).
+          case $VERSION in
+          *+r[0-9]*) tag=${VERSION##*+r} ;;
+          *)
+            day=$(date -u +%Y%m%d)
+            n=$(( $(git -C kit ls-remote --tags "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "refs/tags/$day.*" | wc -l) + 1 ))
+            tag=$day.$n
+            ;;
+          esac
+          if ! [[ $tag =~ ^[0-9]{8}\.[0-9]+$ ]]; then echo "::error::no release tag from version $VERSION ($tag)"; exit 1; fi
           key="ghostty $VERSION ${SHA:0:12}, build.sh $(git -C kit rev-parse --short=12 HEAD:ci/build.sh), README.txt $(git -C kit rev-parse --short=12 HEAD:ci/README.txt), zig $ZIG_VERSION"
           fork=${SRC#https://github.com/}
           fork=${fork%.git}

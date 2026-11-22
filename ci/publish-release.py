@@ -10,7 +10,9 @@ the notes; CHECK_REPOS, more repositories (owner/name, space-separated) whose re
 Order, so that a failure leaves nothing half-public:
   0. publish nothing (exit 0) when a release already carries KEY: the same inputs again; or
      when one already has VERSION: the inputs changed but the version did not, so a warning
-     asks for a new revision in sources.lock (a package version is released once);
+     asks for a new revision in sources.lock (a package version is released once); and
+     fail when <tag> is taken, by a release or by a bare tag (the workflow takes <tag> from
+     the pin's version, so a taken tag means the pin was not bumped);
   1. a draft release (a draft creates no tag) with every asset uploaded;
   2. publish the draft, which creates the tag <tag> at <kit sha>, as the latest release.
 A failure before 2 leaves only a draft, which nobody else sees.
@@ -64,6 +66,17 @@ for rel in releases(repo):
              "from other inputs; bump the revision in sources.lock to release this build")
     if rel["tag_name"] == tag:
         sys.exit(f"::error::tag {tag} is taken ({rel['html_url']})")
+# A tag with no release (a release deleted, its tag kept) is taken too: publishing would
+# move nothing, but the release would sit on an old commit.
+try:
+    req = urllib.request.Request(f"{api}/repos/{repo}/git/ref/tags/{urllib.parse.quote(tag)}", headers={
+        "Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"})
+    with urllib.request.urlopen(req) as r:
+        sys.exit(f"::error::tag {tag} already exists (no release on it); a release is published once")
+except urllib.error.HTTPError as e:
+    if e.code != 404:
+        sys.exit(f"::error::checking tag {tag}: HTTP {e.code}")
 for r in others:
     for rel in releases(r):
         if rel["name"] == f"ghostty {version}":
