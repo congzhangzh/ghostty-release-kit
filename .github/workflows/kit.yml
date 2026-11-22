@@ -144,8 +144,16 @@ jobs:
             echo "**Tests** (\`ci/test-wine.sh\`, x86_64 under Wine with Mesa llvmpipe):"
             grep -E '^(ok|#)' out/test/test.log | sed 's/^/- /'
             echo
-            echo "**Install:** unzip \`ghostty-$VERSION-windows-x86_64.zip\` (or \`-aarch64\` for Windows on Arm) and run \`ghostty.exe\`. README.txt inside says what works and what does not yet."
+            if [ -f "out/ghostty-$VERSION-windows-aarch64.zip" ]; then
+              echo "**Install:** unzip \`ghostty-$VERSION-windows-x86_64.zip\` (or \`-aarch64\` for Windows on Arm) and run \`ghostty.exe\`. README.txt inside says what works and what does not yet."
+            else
+              echo "**Install:** unzip \`ghostty-$VERSION-windows-x86_64.zip\` and run \`ghostty.exe\`. README.txt inside says what works and what does not yet."
+            fi
             echo
+            # An architecture ci/build.sh could not build (x86_64 always builds, or nothing is published).
+            if [ -f out/NOT-BUILT ]; then
+              while read -r a; do echo "**$a:** not built in this release (build error; fixed in the next)."; echo; done < out/NOT-BUILT
+            fi
             echo "Published once, never replaced. <!-- kit-key: $key --> <!-- version: $VERSION -->"
           } > out/notes.md
           cat out/notes.md

@@ -11,7 +11,8 @@
 #                                                 source has windows/resources.sh, and Microsoft's
 #                                                 conpty.dll, OpenConsole.exe and their
 #                                                 THIRD-PARTY-NOTICES.txt when it side-loads them
-# and <out>/SHA256SUMS over the zips. Needs zig (the version build.zig.zon asks for) and zip.
+# and <out>/SHA256SUMS over the zips. Only x86_64 must build; another architecture that fails
+# is left out and named in <out>/NOT-BUILT. Needs zig (the version build.zig.zon asks for) and zip.
 set -euo pipefail
 src=$(cd "$1" && pwd) version=$2 out=$3
 shift 3
@@ -36,7 +37,10 @@ fi
 
 [ -x "$src/windows/build.sh" ] || { echo "::error::$src has no windows/build.sh: not a Windows-capable Ghostty" >&2; exit 1; }
 
-for arch in "$@"; do
+# One architecture: libghostty, the host, the package. Run in its own subshell with set -e, so
+# a failure ends that architecture only (set -e does not apply inside an `if` or `||`).
+one() {
+	local arch=$1 name pkg info nu
 	echo "::group::libghostty $arch"
 	(cd "$src" && zig build -Dtarget="$arch-windows-gnu" -Doptimize=ReleaseFast -Demit-themes=true --prefix "$work/lib-$arch")
 	echo "::endgroup::"
@@ -68,6 +72,23 @@ for arch in "$@"; do
 	cp "$src/LICENSE" "$pkg/LICENSE"
 	sed -e "s/@VERSION@/$version/g" -e "s/@ARCH@/$arch/g" "$kit/ci/README.txt" > "$pkg/README.txt"
 	(cd "$work/pkg-$arch" && rm -f "$out/$name.zip" && zip -q -r -X "$out/$name.zip" "$name")
-	echo "packaged $out/$name.zip ($(du -h "$out/$name.zip" | cut -f1))"
+	echo "packaged $out/$name.zip ($(stat -c %s "$out/$name.zip") bytes)"
+}
+
+# x86_64 must build: it is what releases are tested and used on. Any other architecture is
+# best effort (the owner, 2026-11-22: "focus on x64 ... arm break can be fix by next release"):
+# when it fails, its zip is left out, it is named in <out>/NOT-BUILT, and the release goes on.
+rm -f "$out/NOT-BUILT"
+for arch in "$@"; do
+	set +e
+	(set -e; one "$arch")
+	rc=$?
+	set -e
+	[ $rc = 0 ] && continue
+	echo "::endgroup::"
+	rm -f "$out/ghostty-$version-windows-$arch.zip"
+	if [ "$arch" = x86_64 ]; then echo "::error::x86_64 did not build (exit $rc)" >&2; exit $rc; fi
+	echo "::warning::$arch did not build (exit $rc): left out of this release" >&2
+	echo "$arch" >> "$out/NOT-BUILT"
 done
 (cd "$out" && sha256sum ghostty-*.zip > SHA256SUMS && cat SHA256SUMS)
