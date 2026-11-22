@@ -36,6 +36,12 @@
 #   unchanged, a translucent stats overlay, the readback's cost in the stats, and
 #   GHOSTTY_PRESENT=swap to draw straight into the window (readback stays the default).
 #   Built and tested on x86_64 first; aarch64 is built when it can be.
+#   r20261122.10: r20261122.9 plus About Ghostty for Windows and What's new in the window menu
+#   (Alt+Space, or a right-click on the title bar; now also in full screen), What's new opening
+#   once by itself after an upgrade, Ghostty's motto in the title bar beside the tabs
+#   (GHOSTTY_SLOGAN=false hides it), tabs at most 240 points wide, minimize, restore and close
+#   working when the window is maximized, and GHOSTTY_PRESENT=swap that keeps drawing after a
+#   resize and falls back to the readback when the window cannot be swapped.
 # conpty: Microsoft's console host for pseudoconsoles (conpty.dll + OpenConsole.exe, MIT), the
 #   NuGet package Microsoft.Windows.Console.ConPTY; the commit column is the package's SHA-256.
 #   ci/build.sh puts both files, unmodified, beside ghostty.exe when the source side-loads them
