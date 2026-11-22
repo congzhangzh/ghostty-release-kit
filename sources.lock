@@ -1,0 +1,13 @@
+# Every source the kit builds, pinned: name, version, url, commit.
+# Bump a line and push to main: the kit builds and tests it and publishes the rolling release.
+#
+# ghostty: our release, picked on the fork (congzhangzh/ghostty) as release-<YYYYMMDD>.<N> from
+#   integration-windows (upstream main plus the feature-windows-* branches). The version column
+#   is <upstream version>+r<YYYYMMDD>.<N>, e.g. 1.4.1-dev+r20261121.1. No pick yet: the line is
+#   added with the first one; until then the kit builds ghostty-base as a baseline and
+#   publishes nothing.
+# ghostty-base: the upstream commit the pick sits on. The version column names the upstream
+#   branch, so a test build of another commit finds its own base on it.
+#
+# name          version     url                                                       commit
+ghostty-base    main        git+https://github.com/ghostty-org/ghostty.git#main       11ed660d99fd0dd8dadcaf456db31b71f0f21beb
