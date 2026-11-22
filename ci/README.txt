@@ -15,11 +15,15 @@ too), or the same under %XDG_CONFIG_HOME% when that is set.
 Full screen: F11 or Ctrl+Enter (the whole monitor, no frame, the taskbar hidden); press it
 again to go back. "fullscreen = true" in the config starts every window in full screen.
 
+Tabs: Ctrl+Shift+T or the + opens one (the tab bar appears once there are two); Ctrl+Tab,
+Ctrl+PageUp/PageDown or Alt+1..9 switch; Ctrl+Shift+PageUp/PageDown move a tab; Ctrl+Shift+W,
+the x on a tab or a middle click closes it. Ctrl+Shift+N opens a new window.
+
 Tested before release (under Wine, see the release notes): the window, cmd.exe through
 ConPTY, typing, drawing, and closing when the shell exits.
 Written but first tried on real Windows with this build: PowerShell and WSL, IME input,
 mouse and wheel, copy and paste, per-monitor DPI. Please report what breaks.
-Not yet: tabs, splits, more than one window, the settings UI. Frames are copied through the
+Not yet: splits, the settings UI. Frames are copied through the
 CPU, so very large windows use more CPU than they should.
 
 To keep a log, start it from cmd.exe, which hands the file itself to ghostty:

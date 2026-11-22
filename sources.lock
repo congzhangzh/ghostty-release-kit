@@ -13,9 +13,12 @@
 #   r20261122.3: r20261122.2 plus full screen (Ctrl+Enter, F11, or fullscreen = true: the whole
 #   monitor, no frame, the taskbar hidden; again restores the window) and GHOSTTY_DEBUG_KEYS,
 #   which traces every key message to stderr for keyboard reports.
+#   r20261122.4: r20261122.3 plus tabs (the tab bar appears with two tabs, as on macOS; new,
+#   close, switch, move, move to a new window) and more than one window, and an Alt+key no
+#   longer types its character a second time.
 # ghostty-base: the upstream commit the pick sits on. The version column names the upstream
 #   branch, so a test build of another commit finds its own base on it.
 #
 # name          version                url                                                                commit
-ghostty         1.4.1-dev+r20261122.3  git+https://github.com/congzhangzh/ghostty.git#release-20261122.3  ec3448b6fce76b63fbebfe92299cf6283a062cea
+ghostty         1.4.1-dev+r20261122.4  git+https://github.com/congzhangzh/ghostty.git#release-20261122.4  09eedc922200b808f919dc75112ef16a9140e47b
 ghostty-base    main                   git+https://github.com/ghostty-org/ghostty.git#main                11ed660d99fd0dd8dadcaf456db31b71f0f21beb

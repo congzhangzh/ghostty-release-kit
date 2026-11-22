@@ -58,7 +58,7 @@ upstream `main`, one commit per part (a part grows its own branch when it gets b
 | 1 | WGL | A WGL backend for `renderer/opengl/Device.zig` and the context calls in `OpenGL.zig` (a hidden window's DC, `wglCreateContextAttribsARB` for 4.3 core, made current on the render thread); presentation stays on the CPU-pixel path | done |
 | 2 | embedded | `GHOSTTY_PLATFORM_WINDOWS` (an `HWND`) and `ghostty_surface_take_frame` / `ghostty_frame_free` for a host that presents frames itself | done |
 | 3 | host | `windows/`: `ghostty.exe` in C on Win32: one window, one surface, the frame blitted on `WM_PAINT`, keys as scan codes with their text, IME text, mouse and wheel, resize, per-monitor DPI v2, clipboard with confirmations | done; tested under Wine (window, typing, drawing, exit) before every release, and by hand on Windows 11 with an NVIDIA GPU (a hang on that driver fixed in 20261122.2) |
-| 4 | host UI | full screen (Ctrl+Enter, F11, `fullscreen = true`); tabs, splits, new window, the close confirmation, the IME candidate window position | full screen landed in 20261122.3; the rest open |
+| 4 | host UI | full screen (Ctrl+Enter, F11, `fullscreen = true`); tabs, splits, new window, the close confirmation, the IME candidate window position | full screen landed in 20261122.3, tabs and more than one window in 20261122.4; the rest open |
 | 5 | present | zero-copy presentation (`WGL_NV_DX_interop2` into a D3D11 flip swap chain, or a DirectComposition surface), so frames stop going through the CPU | later |
 | 6 | later | a D3D11 renderer (as Metal is to macOS), MSIX/winget packaging, code signing | open |
 
