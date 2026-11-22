@@ -4,9 +4,9 @@ Builds, tests and releases [Ghostty](https://ghostty.org) for **Windows** (x64 a
 early, unofficial port. The Ghostty code lives in the fork,
 [congzhangzh/ghostty](https://github.com/congzhangzh/ghostty); this repository holds only what
 turns a commit of it into a release: the pin, the build, the tests and the release notes.
-[docs/PLAN.md](docs/PLAN.md) is the plan: what upstream already had, what the port adds, and
-what comes next; [docs/REPORT-20261122.md](docs/REPORT-20261122.md) reports the plan, the
-design and the progress as the first release went out.
+[docs/PLAN.md](docs/PLAN.md) is the technical roadmap: what upstream already had, what the port
+adds, and which parts have landed; [docs/REPORT-20261122.md](docs/REPORT-20261122.md) reports
+the plan, the design and the progress as the first release went out.
 
 ## Install
 
