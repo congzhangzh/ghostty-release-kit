@@ -15,7 +15,7 @@ too), or the same under %XDG_CONFIG_HOME% when that is set.
 Full screen: F11 or Ctrl+Enter (the whole monitor, no frame, the taskbar hidden); press it
 again to go back. "fullscreen = true" in the config starts every window in full screen.
 
-Tabs: Ctrl+Shift+T or the + opens one (the tab bar appears once there are two); Ctrl+Tab,
+Tabs: Ctrl+Shift+T or the + on the tab bar opens one; Ctrl+Tab,
 Ctrl+PageUp/PageDown or Alt+1..9 switch; Ctrl+Shift+PageUp/PageDown move a tab; Ctrl+Shift+W,
 the x on a tab or a middle click closes it. Ctrl+Shift+N opens a new window.
 
