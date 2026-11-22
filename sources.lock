@@ -17,13 +17,16 @@
 #   close, switch, move, move to a new window) and more than one window, and an Alt+key no
 #   longer types its character a second time.
 #   r20261122.5: r20261122.4 with the tab bar shown from the first tab, so its + is there to find.
-#   r20261122.6: r20261122.5 plus the fix for the hang when an unfocused window's renderer
+#   r20261122.6: picked (release-20261122.6, fda0cb3cd) but not published: the aarch64 host did
+#   not build (the hang and crash reports' stack walk read x86_64-only registers).
+#   r20261122.7: r20261122.5 plus the fix for the hang when an unfocused window's renderer
 #   could not be woken (termio woke a copy of its Async), a watchdog that writes a hang report,
-#   crash reports (a Zig panic raised as a Windows exception), ghostty.exe /buildinfo, and a
-#   stats overlay on the inspector key (Ctrl+Shift+I).
+#   crash reports (a Zig panic raised as a Windows exception) with their stack walk on aarch64
+#   too, ghostty.exe /buildinfo, a stats overlay on the inspector key, drawn once per paint,
+#   stderr that never blocks the window, and the build in the window title.
 # ghostty-base: the upstream commit the pick sits on. The version column names the upstream
 #   branch, so a test build of another commit finds its own base on it.
 #
 # name          version                url                                                                commit
-ghostty         1.4.1-dev+r20261122.6  git+https://github.com/congzhangzh/ghostty.git#release-20261122.6  fda0cb3cddd7868913c7db71beb996eda7bb178d
+ghostty         1.4.1-dev+r20261122.7  git+https://github.com/congzhangzh/ghostty.git#release-20261122.7  c78ac0890ecabd2c9f9cea6b5bdafc620e2affe3
 ghostty-base    main                   git+https://github.com/ghostty-org/ghostty.git#main                11ed660d99fd0dd8dadcaf456db31b71f0f21beb
