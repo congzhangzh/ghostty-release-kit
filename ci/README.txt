@@ -12,6 +12,9 @@ The config file is Ghostty's usual one (see https://ghostty.org/docs/config); on
 ghostty.exe reads %LOCALAPPDATA%\ghostty\config.ghostty (the older name "config" there works
 too), or the same under %XDG_CONFIG_HOME% when that is set.
 
+Full screen: F11 or Ctrl+Enter (the whole monitor, no frame, the taskbar hidden); press it
+again to go back. "fullscreen = true" in the config starts every window in full screen.
+
 Tested before release (under Wine, see the release notes): the window, cmd.exe through
 ConPTY, typing, drawing, and closing when the shell exits.
 Written but first tried on real Windows with this build: PowerShell and WSL, IME input,
