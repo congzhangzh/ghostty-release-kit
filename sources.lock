@@ -18,7 +18,9 @@
 #   longer types its character a second time.
 #   r20261122.5: r20261122.4 with the tab bar shown from the first tab, so its + is there to find.
 #   r20261122.6: picked (release-20261122.6, fda0cb3cd) but not published: the aarch64 host did
-#   not build (the hang and crash reports' stack walk read x86_64-only registers).
+#   not build (the hang and crash reports' stack walk read x86_64-only registers). There is no
+#   release 20261122.6: the number is skipped (r20261122.7 went out as tag 20261122.6 for a few
+#   minutes, from a count of the day's tags, and was republished as 20261122.7).
 #   r20261122.7: r20261122.5 plus the fix for the hang when an unfocused window's renderer
 #   could not be woken (termio woke a copy of its Async), a watchdog that writes a hang report,
 #   crash reports (a Zig panic raised as a Windows exception) with their stack walk on aarch64
