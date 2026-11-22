@@ -140,4 +140,4 @@ jobs:
           } > out/notes.md
           cat out/notes.md
           KEY=$key python3 -I kit/ci/publish-release.py "$tag" "$GITHUB_SHA" \
-            "Ghostty for Windows $VERSION, $tag" out/notes.md out/*.zip out/SHA256SUMS
+            "Ghostty for Windows $tag" out/notes.md out/*.zip out/SHA256SUMS

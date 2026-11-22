@@ -6,7 +6,7 @@
 # For each architecture: libghostty (ReleaseFast) for <arch>-windows-gnu, then the host
 # (windows/build.sh in the source) linked against its static library, then
 #   <out>/ghostty-<version>-windows-<arch>.zip   ghostty-<version>-windows-<arch>/ghostty.exe,
-#                                                 LICENSE, README.txt
+#                                                 BUILDINFO.txt, LICENSE, README.txt
 # and <out>/SHA256SUMS over the zips. Needs zig (the version build.zig.zon asks for) and zip.
 set -euo pipefail
 src=$(cd "$1" && pwd) version=$2 out=$3
@@ -27,8 +27,20 @@ for arch in "$@"; do
 	pkg=$work/pkg-$arch/$name
 	rm -rf "$work/pkg-$arch"
 	mkdir -p "$pkg"
-	"$src/windows/build.sh" "$work/lib-$arch" "$arch" "$work/host-$arch" release
+	# What `ghostty.exe /buildinfo` and BUILDINFO.txt say about this release, before what
+	# windows/build.sh adds (source commit, build, core components). The env comes from
+	# ci/resolve.sh and GitHub Actions; a local build has less of it.
+	info=$work/release-info-$arch.txt
+	{
+		case $version in *+r[0-9]*) echo "release: Ghostty for Windows ${version##*+r}" ;; esac
+		echo "version: $version"
+		if [ -n "${REF:-}" ]; then echo "ghostty: ${SRC:-?} $REF @ ${SHA:-?}"; fi
+		if [ -n "${BASE:-}" ]; then echo "upstream base: ghostty-org/ghostty $(git -C "$src" rev-parse "$BASE" 2> /dev/null || echo "$BASE")"; fi
+		if [ -n "${GITHUB_SHA:-}" ]; then echo "kit: ${GITHUB_REPOSITORY:-ghostty-release-kit} @ $GITHUB_SHA"; fi
+	} > "$info"
+	BUILDINFO_FILE=$info "$src/windows/build.sh" "$work/lib-$arch" "$arch" "$work/host-$arch" release
 	cp "$work/host-$arch/ghostty.exe" "$pkg/"
+	if [ -f "$work/host-$arch/BUILDINFO.txt" ]; then cp "$work/host-$arch/BUILDINFO.txt" "$pkg/"; fi
 	cp "$src/LICENSE" "$pkg/LICENSE"
 	sed -e "s/@VERSION@/$version/g" -e "s/@ARCH@/$arch/g" "$kit/ci/README.txt" > "$pkg/README.txt"
 	(cd "$work/pkg-$arch" && rm -f "$out/$name.zip" && zip -q -r -X "$out/$name.zip" "$name")

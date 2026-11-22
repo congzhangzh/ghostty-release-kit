@@ -26,6 +26,14 @@ mouse and wheel, copy and paste, per-monitor DPI. Please report what breaks.
 Not yet: splits, the settings UI. Frames are copied through the
 CPU, so very large windows use more CPU than they should.
 
+What this build is (release, commits, core components): BUILDINFO.txt here, or
+
+    ghostty.exe /buildinfo
+
+If ghostty stops responding for 5 seconds or crashes, it writes a report (the stacks of its
+threads and a minidump) to %LOCALAPPDATA%\ghostty\hangs or ...\crashes. Please attach those
+files when you report the problem.
+
 To keep a log, start it from cmd.exe, which hands the file itself to ghostty:
 
     set GHOSTTY_LOG=stderr
