@@ -3,10 +3,12 @@
 #
 #   ci/build.sh <ghostty source> <version> <out dir> <arch>...      arch: x86_64, aarch64
 #
-# For each architecture: libghostty (ReleaseFast) for <arch>-windows-gnu, then the host
-# (windows/build.sh in the source) linked against its static library, then
+# For each architecture: libghostty (ReleaseFast, with the themes) for <arch>-windows-gnu, then
+# the host (windows/build.sh in the source) linked against its static library, then
 #   <out>/ghostty-<version>-windows-<arch>.zip   ghostty-<version>-windows-<arch>/ghostty.exe,
-#                                                 BUILDINFO.txt, LICENSE, README.txt
+#                                                 BUILDINFO.txt, LICENSE, README.txt, and share/
+#                                                 (themes, shell integration, terminfo) when the
+#                                                 source has windows/resources.sh
 # and <out>/SHA256SUMS over the zips. Needs zig (the version build.zig.zon asks for) and zip.
 set -euo pipefail
 src=$(cd "$1" && pwd) version=$2 out=$3
@@ -21,7 +23,7 @@ kit=$(cd "$(dirname "$0")/.." && pwd)
 
 for arch in "$@"; do
 	echo "::group::libghostty $arch"
-	(cd "$src" && zig build -Dtarget="$arch-windows-gnu" -Doptimize=ReleaseFast --prefix "$work/lib-$arch")
+	(cd "$src" && zig build -Dtarget="$arch-windows-gnu" -Doptimize=ReleaseFast -Demit-themes=true --prefix "$work/lib-$arch")
 	echo "::endgroup::"
 	name=ghostty-$version-windows-$arch
 	pkg=$work/pkg-$arch/$name
@@ -40,6 +42,8 @@ for arch in "$@"; do
 	} > "$info"
 	BUILDINFO_FILE=$info "$src/windows/build.sh" "$work/lib-$arch" "$arch" "$work/host-$arch" release
 	cp "$work/host-$arch/ghostty.exe" "$pkg/"
+	# Ghostty's resources beside ghostty.exe (share/terminfo is what the core looks for).
+	if [ -x "$src/windows/resources.sh" ]; then "$src/windows/resources.sh" "$work/lib-$arch" "$pkg"; fi
 	if [ -f "$work/host-$arch/BUILDINFO.txt" ]; then cp "$work/host-$arch/BUILDINFO.txt" "$pkg/"; fi
 	cp "$src/LICENSE" "$pkg/LICENSE"
 	sed -e "s/@VERSION@/$version/g" -e "s/@ARCH@/$arch/g" "$kit/ci/README.txt" > "$pkg/README.txt"

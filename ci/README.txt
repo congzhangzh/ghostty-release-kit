@@ -4,13 +4,19 @@ Ghostty @VERSION@ for Windows (@ARCH@)
 An early build of the Ghostty terminal for Windows 10 (1809 or later) and 11, from
 https://github.com/congzhangzh/ghostty-release-kit. Not an official Ghostty release.
 
-Run ghostty.exe. It opens one window with cmd.exe; set another shell in the config, e.g.
+Run ghostty.exe. It opens one window with PowerShell 7 (pwsh.exe) when it is installed, else
+Windows PowerShell, else cmd.exe; set another shell in the config, e.g.
 
-    command = pwsh.exe
+    command = cmd.exe
 
 The config file is Ghostty's usual one (see https://ghostty.org/docs/config); on Windows
 ghostty.exe reads %LOCALAPPDATA%\ghostty\config.ghostty (the older name "config" there works
 too), or the same under %XDG_CONFIG_HOME% when that is set.
+
+Themes: "theme = <name>" in the config, from the themes in share\ghostty\themes here (the few
+whose names have a colon are left out: Windows can't hold such a file name), or your own
+under %LOCALAPPDATA%\ghostty\themes. Keep the share folder beside ghostty.exe: it also has
+Ghostty's shell integration for bash, zsh, fish, elvish and nushell (not yet tried on Windows).
 
 Full screen: F11 or Ctrl+Enter (the whole monitor, no frame, the taskbar hidden); press it
 again to go back. "fullscreen = true" in the config starts every window in full screen.
