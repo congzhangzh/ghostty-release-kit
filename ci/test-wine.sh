@@ -19,6 +19,9 @@ log=$out/test.log
 # Keep Ghostty's log and Wine's errors in ghostty.log: a failure on a runner is read from them.
 export WINEPREFIX=${WINEPREFIX:-$out/wineprefix} WINEDEBUG=${WINEDEBUG:-err+all,fixme-all} WINEDLLOVERRIDES="mscoree,mshtml="
 export GHOSTTY_LOG=${GHOSTTY_LOG:-stderr}
+# What's new opens by itself once after an upgrade when the build has notes (a release): it
+# would cover the window this test types into. Off here, as for every test.
+export GHOSTTY_WHATSNEW=off
 
 say() { echo "$*" | tee -a "$log"; }
 fail() { say "FAIL $*"; cleanup; exit 1; }
