@@ -225,8 +225,18 @@ int main(int argc, char **argv) {
 	if (has(r, "\"protocol\":1")) OK("hello: protocol 1 (%.200s)", r); else FAIL("hello: %s", r ? r : "no answer");
 	free(r);
 
-	r = ctl("{\"cmd\":\"list\"}");
-	int ids[16], n = panes(r, ids, 16);
+	/* The pipe opens before the first window (the host starts it first), and that window can
+	   take seconds on a slow machine (run 45223332720, windows-11-arm, installed: the OpenGL
+	   fallback and the DXGI probe came first, and an immediate list had no window). Wait for it. */
+	int ids[16], n = 0;
+	DWORD tw = GetTickCount();
+	for (r = NULL; GetTickCount() - tw < 30000; Sleep(250)) {
+		free(r);
+		r = ctl("{\"cmd\":\"list\"}");
+		if (!r || strstr(r, "\"pane\":")) break;
+	}
+	n = panes(r, ids, 16);
+	if (n) INFO("the first window after %lu ms", GetTickCount() - t0);
 	if (count(r, "\"window\":") == 1 && n == 1) OK("one window, one pane (pane %d)", ids[0]);
 	else FAIL("one window, one pane: %.500s", r ? r : "no answer");
 	free(r);
