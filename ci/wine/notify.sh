@@ -47,7 +47,7 @@ run() { focus; xdotool type --delay 40 "$1"; xdotool key Return; sleep "${2:-2}"
 
 # 1. selected tab, foreground window
 run 'C:\emit.exe "\e]9;one\e\\"' 3
-check "1. from the selected tab of the foreground window: not shown" 'notify: "[^"]*" / "one" not shown: its tab is the selected tab'
+check "1. from the selected tab of the foreground window: not shown" 'notify: "[^"]*" / "one" not shown: its (tab is the selected tab|pane is the focused pane)'
 # 3. progress in tab 1
 run 'C:\emit.exe "\e]9;4;1;50\e\\"' 3
 check "3. progress 50 reaches the taskbar" 'notify: taskbar progress normal 50 \(HRESULT'
