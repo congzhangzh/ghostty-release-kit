@@ -328,7 +328,7 @@ jobs:
   # One verdict per run: every job named in MUST_TEST passed (the other test jobs are reported,
   # not required), and each job's minutes, so the cost of the loop is on every run's page.
   gate:
-    needs: [changes, build, wine-x64, wine-arm64, windows, pypi-test]
+    needs: [changes, build, wine-x64, wine-arm64, windows, pypi-test, installer-test]
     if: always() && needs.build.result != 'skipped'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -343,7 +343,7 @@ jobs:
             echo
             echo "| job | result | required |"
             echo "|---|---|---|"
-            for j in build wine-x64 wine-arm64 windows pypi-test; do
+            for j in build wine-x64 wine-arm64 windows pypi-test installer-test; do
               r=$(jq -r --arg j "$j" '.[$j].result' <<< "$NEEDS")
               req=no; case " build $MUST_TEST " in *" $j "*) req=yes ;; esac
               echo "| $j | $r | $req |"
@@ -391,6 +391,13 @@ jobs:
         with:
           name: wine-x64
           path: out/wine-x64
+      # The installers (installer/ghostty.iss), when they were built; the release goes out
+      # without them otherwise.
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: installers
+          path: out/installers
       - name: Publish the rolling release
         id: release
         env:
@@ -410,7 +417,7 @@ jobs:
           esac
           if ! [[ $tag =~ ^[0-9]{8}\.[0-9]+$ ]]; then echo "::error::no release tag from version $VERSION ($tag)"; exit 1; fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          key="ghostty $VERSION ${SHA:0:12}, build.sh $(git -C kit rev-parse --short=12 HEAD:ci/build.sh), README.txt $(git -C kit rev-parse --short=12 HEAD:ci/README.txt), about.py $(git -C kit rev-parse --short=12 HEAD:ci/about.py 2> /dev/null || echo none), notices $(git -C kit rev-parse --short=12 HEAD:ci/THIRD-PARTY-NOTICES-mesa.txt 2> /dev/null || echo none), zig $ZIG_VERSION"
+          key="ghostty $VERSION ${SHA:0:12}, build.sh $(git -C kit rev-parse --short=12 HEAD:ci/build.sh), README.txt $(git -C kit rev-parse --short=12 HEAD:ci/README.txt), about.py $(git -C kit rev-parse --short=12 HEAD:ci/about.py 2> /dev/null || echo none), notices $(git -C kit rev-parse --short=12 HEAD:ci/THIRD-PARTY-NOTICES-mesa.txt 2> /dev/null || echo none), installer $(git -C kit rev-parse --short=12 HEAD:installer/ghostty.iss 2> /dev/null || echo none), zig $ZIG_VERSION"
           fork=${SRC#https://github.com/}
           fork=${fork%.git}
           testlog=$(find out/wine-x64 -path '*test-wine*/test.log' | head -1)
@@ -439,8 +446,11 @@ jobs:
             echo "Published once, never replaced. <!-- kit-key: $key --> <!-- version: $VERSION -->"
           } > out/notes.md
           cat out/notes.md
+          setups=$(ls out/installers/*-setup.exe 2> /dev/null || true)
+          if [ -n "$setups" ]; then (cd out/installers && sha256sum -- *-setup.exe) >> out/SHA256SUMS; fi
+          # shellcheck disable=SC2086 # one word per installer
           KEY=$key python3 -I kit/ci/publish-release.py "$tag" "$GITHUB_SHA" \
-            "Ghostty for Windows $tag" out/notes.md out/*.zip out/SHA256SUMS
+            "Ghostty for Windows $tag" out/notes.md out/*.zip $setups out/SHA256SUMS
 
   # ghostty-for-windows on PyPI (pypi/): the launcher package, repacked into one wheel per
   # architecture with the build's whole zip inside (pypi/bundle.py). Its version is the
@@ -566,3 +576,85 @@ jobs:
           if python3 -I -c "import sys; sys.exit(0 if $bytes >= 7e9 else 1)"; then
             echo "::warning::ghostty-for-windows on PyPI is $gb GB, past 7 GB of the 10 GB limit: ask PyPI for more"
           fi
+
+  # The per-user installers (installer/ghostty.iss), one per architecture, made by Inno Setup
+  # on a Windows runner from the build's zips. Inno Setup 6.7.4 is fetched from its GitHub
+  # release and checked against its SHA-256, then installed for this user only.
+  installer:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      VERSION: ${{ needs.build.outputs.VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ghostty-${{ needs.build.outputs.VERSION }}
+          path: out
+      - name: Inno Setup 6.7.4
+        shell: pwsh
+        run: |
+          $f = "$env:RUNNER_TEMP\innosetup-6.7.4.exe"
+          curl.exe -fsSL --retry 3 -o $f https://github.com/jrsoftware/issrc/releases/download/is-6_7_4/innosetup-6.7.4.exe
+          $h = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
+          if ($h -ne 'a549929319f9120716677c685535ca4671e4b937b5fdc87e2585f32d8eb30e8c') { throw "innosetup-6.7.4.exe differs from its pin ($h)" }
+          $dir = "$env:RUNNER_TEMP\inno"
+          Start-Process -FilePath $f -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "/DIR=$dir") -Wait
+          if (-not (Test-Path "$dir\ISCC.exe")) { throw "no ISCC.exe in $dir" }
+          "ISCC=$dir\ISCC.exe" >> $env:GITHUB_ENV
+      - name: Build the installers (x86_64, aarch64)
+        shell: pwsh
+        run: |
+          $tag = if ($env:VERSION -match '\+r(\d{8}\.\d+)$') { $Matches[1] } else { "0.dev$env:GITHUB_RUN_NUMBER" }
+          $fv = if ($tag -match '^(\d{4})(\d{2})(\d{2})\.(\d+)$') { '{0}.{1}.{2}.{3}' -f [int]$Matches[1], [int]$Matches[2], [int]$Matches[3], [int]$Matches[4] } else { '0.0.0.0' }
+          New-Item -ItemType Directory -Force installers | Out-Null
+          foreach ($zip in Get-ChildItem out -Filter '*-windows-*.zip') {
+            $arch = if ($zip.Name -match '-windows-(x86_64|aarch64)\.zip$') { $Matches[1] } else { continue }
+            $stage = "$env:RUNNER_TEMP\stage-$arch"
+            Expand-Archive $zip.FullName -DestinationPath $stage -Force
+            $src = (Get-ChildItem $stage -Directory | Select-Object -First 1).FullName
+            & $env:ISCC /Q "/DVersion=$tag" "/DFileVersion=$fv" "/DArch=$arch" "/DSrc=$src" "/DOut=$PWD\installers" installer\ghostty.iss
+            if ($LASTEXITCODE) { throw "ISCC failed for $arch ($LASTEXITCODE)" }
+          }
+          Get-ChildItem installers | ForEach-Object { "{0}  {1} bytes" -f $_.Name, $_.Length }
+          "### Installers`n" >> $env:GITHUB_STEP_SUMMARY
+          Get-ChildItem installers | ForEach-Object { "- ``$($_.Name)``: $([math]::Round($_.Length / 1MB, 1)) MB" } >> $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers
+          path: installers/
+
+  # Each installer on its own architecture: install silently (no admin), check the files, the
+  # Apps & features entry, the Start-menu shortcut and its AppUserModelID, "Open Ghostty here",
+  # start ghostty.exe, install over it while it runs, uninstall silently, nothing left
+  # (ci/test-installer.ps1).
+  installer-test:
+    needs: installer
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            arch: x86_64
+          - runner: windows-11-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: installers
+          path: installers
+      - name: Install, run, upgrade, uninstall (${{ matrix.arch }})
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem installers -Filter "*-windows-${{ matrix.arch }}-setup.exe" | Select-Object -First 1
+          if (-not $setup) { throw "no ${{ matrix.arch }} installer" }
+          ./ci/test-installer.ps1 -Setup $setup.FullName -Out installer-test
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-test-${{ matrix.arch }}
+          path: installer-test/

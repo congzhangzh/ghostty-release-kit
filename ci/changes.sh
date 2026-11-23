@@ -27,7 +27,7 @@ while IFS= read -r path; do
 	case $path in
 	*.md | LICENSE) ;;
 	sources.lock) [ "$(pins "$before")" = "$(pins "$after")" ] || release ;;
-	ci/build.sh | ci/about.py | ci/README.txt | ci/THIRD-PARTY-NOTICES*.txt) release ;;
+	ci/build.sh | ci/about.py | ci/README.txt | ci/THIRD-PARTY-NOTICES*.txt | installer/ghostty.iss) release ;;
 	*) scope="test" ;;
 	esac
 done < <(git diff --name-only "$before" "$after")
