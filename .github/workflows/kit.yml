@@ -74,6 +74,11 @@ jobs:
           version: ${{ env.ZIG_VERSION }}
 
       - name: Build (x86_64 and aarch64)
+        env:
+          # The architectures a release cannot go out without (ci/build.sh). Both while the owner
+          # uses Windows on Arm (2026-11-23: "be sure arm64 works now"); "x86_64" alone brings
+          # back x64 first, where a failed aarch64 is left out of the release and named in its notes.
+          MUST_BUILD: x86_64 aarch64
         run: |
           sudo apt-get install -y -q zip > /dev/null
           kit/ci/build.sh ghostty "$VERSION" out x86_64 aarch64

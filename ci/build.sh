@@ -11,8 +11,8 @@
 #                                                 source has windows/resources.sh, and Microsoft's
 #                                                 conpty.dll, OpenConsole.exe and their
 #                                                 THIRD-PARTY-NOTICES.txt when it side-loads them
-# and <out>/SHA256SUMS over the zips. Only x86_64 must build; another architecture that fails
-# is left out and named in <out>/NOT-BUILT. Needs zig (the version build.zig.zon asks for), zip,
+# and <out>/SHA256SUMS over the zips. The architectures in MUST_BUILD (default x86_64) must
+# build; another that fails is left out and named in <out>/NOT-BUILT. Needs zig (the version build.zig.zon asks for), zip,
 # curl and python3.
 set -euo pipefail
 src=$(cd "$1" && pwd) version=$2 out=$3
@@ -97,9 +97,12 @@ one() {
 	echo "packaged $out/$name.zip ($(stat -c %s "$out/$name.zip") bytes)"
 }
 
-# x86_64 must build: it is what releases are tested and used on. Any other architecture is
-# best effort (the owner, 2026-11-22: "focus on x64 ... arm break can be fix by next release"):
-# when it fails, its zip is left out, it is named in <out>/NOT-BUILT, and the release goes on.
+# MUST_BUILD (space-separated, default x86_64) names the architectures a release cannot go out
+# without: one of them failing fails the build. Any other architecture is best effort (the
+# owner, 2026-11-22: "focus on x64 ... arm break can be fix by next release"): when it fails,
+# its zip is left out, it is named in <out>/NOT-BUILT, and the release goes on. The workflow
+# sets MUST_BUILD; while x86_64 alone is required it is the release's tested architecture.
+must=" ${MUST_BUILD:-x86_64} "
 rm -f "$out/NOT-BUILT"
 for arch in "$@"; do
 	set +e
@@ -109,7 +112,7 @@ for arch in "$@"; do
 	[ $rc = 0 ] && continue
 	echo "::endgroup::"
 	rm -f "$out/ghostty-$version-windows-$arch.zip"
-	if [ "$arch" = x86_64 ]; then echo "::error::x86_64 did not build (exit $rc)" >&2; exit $rc; fi
+	if [[ $must == *" $arch "* ]]; then echo "::error::$arch did not build (exit $rc), and MUST_BUILD requires it" >&2; exit $rc; fi
 	echo "::warning::$arch did not build (exit $rc): left out of this release" >&2
 	echo "$arch" >> "$out/NOT-BUILT"
 done
