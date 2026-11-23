@@ -320,6 +320,8 @@ jobs:
             wintest/fonts/ghostty.log
             wintest/fonts/shot.png
             wintest/fonts.stdout
+            wintest/fonts.stderr
+            wintest/fonts/*.json
             wintest/after-typing.bmp
           if-no-files-found: ignore
 

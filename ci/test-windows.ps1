@@ -46,7 +46,9 @@ function Section([string] $name) {
 	Write-Host "=== $name"
 }
 
-Add-Type -TypeDefinition @'
+# The C# helpers. A compile error stops the test at once (run 45172207418: one did not, and
+# every check that needs them reported nothing).
+Add-Type -ErrorAction Stop -TypeDefinition @'
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -142,11 +144,11 @@ public static class W {
 		Marshal.Copy(bits, px, 0, px.Length);
 		SelectObject(mdc, old); DeleteObject(dib); DeleteDC(mdc); ReleaseDC(IntPtr.Zero, sdc);
 		if (bmp != null) {
-			using (var f = new System.IO.BinaryWriter(System.IO.File.Create(bmp))) {
+			using (var bw = new System.IO.BinaryWriter(System.IO.File.Create(bmp))) {
 				int size = 54 + px.Length * 4;
-				f.Write((ushort)0x4D42); f.Write(size); f.Write(0); f.Write(54);
-				f.Write(40); f.Write(w); f.Write(-ht); f.Write((ushort)1); f.Write((ushort)32); f.Write(0); f.Write(px.Length * 4); f.Write(2835); f.Write(2835); f.Write(0); f.Write(0);
-				foreach (int p in px) f.Write(p);
+				bw.Write((ushort)0x4D42); bw.Write(size); bw.Write(0); bw.Write(54);
+				bw.Write(40); bw.Write(w); bw.Write(-ht); bw.Write((ushort)1); bw.Write((ushort)32); bw.Write(0); bw.Write(px.Length * 4); bw.Write(2835); bw.Write(2835); bw.Write(0); bw.Write(0);
+				foreach (int q in px) bw.Write(q);
 			}
 		}
 		var counts = new Dictionary<int, int>();
@@ -469,6 +471,10 @@ if (-not $hasPipe -or -not $bash -or -not $py) {
 	if (-not $p.WaitForExit(240000)) { $p.Kill(); Say 'info' 'fonts: no exit in 240 s' }
 	Remove-Item Env:RUN, Env:PY -ErrorAction SilentlyContinue
 	foreach ($l in @(Get-Content "$Out\fonts.stdout" -Encoding utf8 -ErrorAction SilentlyContinue)) { if ($l.Trim()) { Say 'info' "fonts: $l" } }
+	# Also straight from Ghostty's log, and the script's errors (run 45172207418: its stdout was
+	# empty, while the log had the fallback lines).
+	foreach ($l in @(Get-Content "$fontsOut\ghostty.log" -Encoding utf8 -ErrorAction SilentlyContinue | Where-Object { $_ -match 'found codepoint' })) { Say 'info' "fonts (log): $l" }
+	foreach ($l in @(Get-Content "$Out\fonts.stderr" -Encoding utf8 -ErrorAction SilentlyContinue | Select-Object -Last 15)) { if ($l.Trim()) { Say 'info' "fonts (stderr): $l" } }
 	Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 }
 
