@@ -9,9 +9,19 @@ adds, and which parts have landed; [docs/DESIGN.md](docs/DESIGN.md) is how it wo
 
 ## Install
 
-Take the newest [release](../../releases/latest), unzip `ghostty-<version>-windows-x86_64.zip`
-(or `-aarch64` on Windows on Arm) and run `ghostty.exe`. One file, no installer; the
-`README.txt` beside it says what works and what does not yet.
+Take the newest [release](../../releases/latest) and run
+`ghostty-<version>-windows-x86_64-setup.exe` (or `-aarch64-setup.exe` on Windows on Arm): it
+installs for you alone, with no admin rights, into `%LOCALAPPDATA%\Programs\Ghostty`, adds
+Ghostty to the Start menu and "Open Ghostty here" to folders in Explorer, and uninstalls from
+Settings > Apps. It is not signed yet, so SmartScreen says "Windows protected your PC" the first
+time: More info, then Run anyway. Or unzip `ghostty-<version>-windows-x86_64.zip` (`-aarch64`)
+anywhere and run `ghostty.exe`; the `README.txt` beside it says what works and what does not
+yet.
+
+Ghostty for Windows opens a local stats pipe (`\\.\pipe\ghostty-<pid>.stats`) for your own
+tools: frame timings, CPU and memory, tab titles. Only processes of your own user on this
+machine can open it, and it never carries what is on the screen. GHOSTTY_STATS_IPC=off turns it
+off.
 
 ## What the port is
 

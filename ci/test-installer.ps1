@@ -77,6 +77,28 @@ if ($Probes -and (Test-Path "$Probes\e2e.exe")) {
 	Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 } else { Say 'info' 'no -Probes: the toast check is not run' }
 
+# 2c. "Open Ghostty here" on a folder with a Chinese name: the menu's own command with %V
+# filled in. The core reads the UTF-16 command line (lane A), so the shell must start there.
+$cn = [string][char]0x9879 + [char]0x76EE  # a two-character Chinese word ("project")
+$dir = Join-Path $env:TEMP "ghostty-open-here-$cn"
+New-Item -ItemType Directory -Force $dir | Out-Null
+$menu = (Get-ItemProperty 'HKCU:\Software\Classes\Directory\shell\GhosttyHere\command' -ErrorAction SilentlyContinue).'(default)'
+if ($menu -match '^"([^"]+)" (.*)$') {
+	$args2 = $Matches[2].Replace('%V', $dir)
+	$env:GHOSTTY_TEST_CONTROL = '1'
+	$g = Start-Process -FilePath $Matches[1] -ArgumentList $args2 -PassThru
+	$text = ''
+	[Console]::OutputEncoding = [Text.Encoding]::UTF8
+	for ($i = 0; $i -lt 30 -and $text -notmatch [regex]::Escape($cn); $i++) {
+		Start-Sleep -Seconds 1
+		$text = (& "$app\ghostty.exe" --ctl $g.Id '{"cmd":"read"}' 2>$null | Out-String)
+	}
+	Remove-Item Env:GHOSTTY_TEST_CONTROL -ErrorAction SilentlyContinue
+	Check ($text -match [regex]::Escape($cn)) "'Open Ghostty here' on a Chinese-named folder: the shell starts in it ($args2)"
+	Stop-Process -Id $g.Id -Force -ErrorAction SilentlyContinue
+} else { Check $false "the folder menu's command: $menu" }
+Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
 # 3. an upgrade in place: the same setup again, while Ghostty runs
 $g = Start-Process -FilePath "$app\ghostty.exe" -PassThru
 Start-Sleep -Seconds 4

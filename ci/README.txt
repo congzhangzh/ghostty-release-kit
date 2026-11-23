@@ -44,6 +44,10 @@ mouse and wheel, copy and paste, per-monitor DPI. Please report what breaks.
 Not yet: splits, the settings UI. Frames are copied through the
 CPU, so very large windows use more CPU than they should.
 
+Ghostty for Windows opens a local stats pipe (\\.\pipe\ghostty-<pid>.stats) for your own tools:
+frame timings, CPU and memory, tab titles. Only processes of your own user on this machine can
+open it, and it never carries what is on the screen. GHOSTTY_STATS_IPC=off turns it off.
+
 What this build is (release, commits, core components): BUILDINFO.txt here, or
 
     ghostty.exe /buildinfo

@@ -308,6 +308,19 @@ int main(int argc, char **argv) {
 		if (e && has(e, "\"shown\":true")) OK("a notification from the split's unfocused pane is shown: %.200s", e);
 		else FAIL("a notification from the split's unfocused pane: %.300s", e ? e : "no event in 10 s");
 		free(e);
+		/* A long notification body (OSC 777), 2000 bytes of "&<": XML escaping makes it about
+		   9000 characters, beyond the 4096-character buffer the first toast code had (lane A's
+		   review). Shown, cut to fit, and Ghostty lives on. (The core drops an OSC over 2048
+		   bytes, so a longer body never reaches the host.) */
+		Sleep(1500); /* the core lets one notification through per second (Surface.zig) */
+		snprintf(line, sizeof line, "%s\"%s\" --long-notify 2000", g_pwsh ? "& " : "", emit);
+		type_line_in(ids[1], line);
+		e = wait_event(&since, 10000, "\"kind\":\"notification\"", "\"title\":\"long\"", NULL);
+		char *alive = ctl("{\"cmd\":\"hello\"}");
+		if (e && has(alive, "\"ok\":true")) OK("a 2000-byte notification body of \"&<\" (OSC 777): an event, and Ghostty still answers");
+		else FAIL("a 2000-byte notification body: event %s, Ghostty %s", e ? "yes" : "none in 10 s", has(alive, "\"ok\":true") ? "answers" : "does not answer");
+		free(e);
+		free(alive);
 	}
 
 	/* Resize: the grid follows. */
