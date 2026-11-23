@@ -57,7 +57,10 @@ function Run-One([string] $name, [int] $run) {
 	switch ($name) {
 		'ghostty' {
 			$env:GHOSTTY_WHATSNEW = 'off'
-			$p = Start-Process -FilePath $ghostty -ArgumentList "--command=$cat $data $result" -PassThru
+			# One argument: Start-Process joins its list unquoted, so "--command=a b c" must carry its
+			# own quotes or Ghostty gets --command=a and two stray arguments (run 45204591235: no
+			# Ghostty result on either arch, catbench ran without its file).
+			$p = Start-Process -FilePath $ghostty -ArgumentList "`"--command=$cat $data $result`"" -PassThru
 		}
 		'conhost' { $p = Start-Process -FilePath "$env:SystemRoot\System32\conhost.exe" -ArgumentList "`"$cat`" `"$data`" `"$result`"" -PassThru }
 		'windows-terminal' { $p = Start-Process -FilePath 'wt.exe' -ArgumentList "-w new `"$cat`" `"$data`" `"$result`"" -PassThru }
@@ -67,7 +70,11 @@ function Run-One([string] $name, [int] $run) {
 	Start-Sleep -Seconds 1
 	Get-Process -ErrorAction SilentlyContinue | Where-Object { $before -notcontains $_.Id -and $_.ProcessName -match '^(ghostty|conhost|WindowsTerminal|OpenConsole|catbench)$' } |
 		Stop-Process -Force -ErrorAction SilentlyContinue
-	if (-not $r) { "  $name run ${run}: no result in 300 s"; return $null }
+	if (-not $r) {
+		"  $name run ${run}: no result in 300 s"
+		if ($name -eq 'ghostty') { "  (Ghostty's command line: --command=$cat $data $result)" }
+		return $null
+	}
 	$f = $r.Split(' ')
 	$mbs = [math]::Round(([double]$f[0] / 1e6) / ([double]$f[1] / 1000), 1)
 	"  $name run ${run}: $($f[0]) bytes in $($f[1]) ms = $mbs MB/s"
