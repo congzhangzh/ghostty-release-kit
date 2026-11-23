@@ -25,9 +25,9 @@ $lnk = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Ghostty.lnk
 $menus = 'HKCU:\Software\Classes\Directory\shell\GhosttyHere', 'HKCU:\Software\Classes\Directory\Background\shell\GhosttyHere', 'HKCU:\Software\Classes\Drive\shell\GhosttyHere'
 $aumid = 'GhosttyForWindows.Ghostty'
 
-function Install([string] $log) {
+function Install([string] $log, [string[]] $more = @()) {
 	$t = Get-Date
-	$p = Start-Process -FilePath $Setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS', "/LOG=$log") -PassThru -Wait
+	$p = Start-Process -FilePath $Setup -ArgumentList (@('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$log") + $more) -PassThru -Wait
 	return @($p.ExitCode, [int]((Get-Date) - $t).TotalSeconds)
 }
 
@@ -99,14 +99,25 @@ if ($menu -match '^"([^"]+)" (.*)$') {
 } else { Check $false "the folder menu's command: $menu" }
 Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
-# 3. an upgrade in place: the same setup again, while Ghostty runs
+# 3. an upgrade over a running Ghostty (the PO's rule: closing it ends its shells, so a silent
+# setup never does that unless told to)
+# 3a. silent, not told: it refuses (exit 5, the log line), closes nothing, changes nothing
 $g = Start-Process -FilePath "$app\ghostty.exe" -PassThru
 Start-Sleep -Seconds 4
-$r = Install "$Out\upgrade.log"
-Check ($r[0] -eq 0) "install again over it, Ghostty running: exit $($r[0]) in $($r[1]) s"
-Check (Test-Path "$app\ghostty.exe") "  ghostty.exe still there after the upgrade"
-if (-not $g.HasExited) { Say 'info' "  the running Ghostty was not closed by setup (pid $($g.Id)); stopped now"; Stop-Process -Id $g.Id -Force -ErrorAction SilentlyContinue }
-else { Say 'info' "  the running Ghostty was closed by setup (Restart Manager)" }
+$before = (Get-FileHash "$app\ghostty.exe").Hash + (Get-Item "$app\ghostty.exe").LastWriteTimeUtc.Ticks
+$r = Install "$Out\upgrade-refused.log"
+$logText = Get-Content "$Out\upgrade-refused.log" -Raw -ErrorAction SilentlyContinue
+Check ($r[0] -eq 5) "silent upgrade over a running Ghostty refuses: exit $($r[0]) (5: setup cannot proceed)"
+Check ($logText -match 'Ghostty is running; close it or pass /FORCECLOSEAPPLICATIONS') "  its log says: Ghostty is running; close it or pass /FORCECLOSEAPPLICATIONS"
+Check (-not $g.HasExited) "  the running Ghostty was left running"
+$after = (Get-FileHash "$app\ghostty.exe").Hash + (Get-Item "$app\ghostty.exe").LastWriteTimeUtc.Ticks
+Check ($before -eq $after) "  nothing changed: ghostty.exe is the same file"
+# 3b. silent, told to (/FORCECLOSEAPPLICATIONS): it closes Ghostty and installs
+$r = Install "$Out\upgrade-forced.log" @('/FORCECLOSEAPPLICATIONS')
+Check ($r[0] -eq 0) "silent upgrade with /FORCECLOSEAPPLICATIONS: exit $($r[0]) in $($r[1]) s"
+Start-Sleep -Seconds 1
+Check $g.HasExited "  setup closed the running Ghostty"
+Check (Test-Path "$app\ghostty.exe") "  ghostty.exe there after the upgrade"
 Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Get-Process OpenConsole -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$app*" } | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 1

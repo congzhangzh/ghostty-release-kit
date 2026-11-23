@@ -65,7 +65,13 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 SetupLogging=yes
-; A running Ghostty is closed for an upgrade (the Restart Manager), not left holding files.
+; A running Ghostty on an upgrade (the PO's decision, after the macOS app: its updater asks
+; before it quits the app, and closing Ghostty ends the shells running in it):
+;   - interactive: Inno's "Preparing to Install" page names it, says its shells will end, and the
+;     user chooses to close it or not;
+;   - silent (/SILENT, /VERYSILENT: CI, scripts, a package manager): nothing is closed; setup
+;     stops with exit code 5 and the log line "Ghostty is running; close it or pass
+;     /FORCECLOSEAPPLICATIONS". With /FORCECLOSEAPPLICATIONS it is closed (forced).
 CloseApplications=yes
 RestartApplications=no
 #if Arch == "aarch64"
@@ -103,3 +109,41 @@ Root: HKCU; Subkey: "Software\Classes\Drive\shell\GhosttyHere\command"; ValueTyp
 
 [Run]
 Filename: "{app}\ghostty.exe"; Description: "Start Ghostty"; Flags: nowait postinstall skipifsilent
+
+[Messages]
+ApplicationsFound2=Ghostty is running and must be closed to update it. Closing it ends the shells and programs running in its windows. Setup can close it now, or you can close it yourself and click Next.
+
+[Code]
+// Is a ghostty.exe of this install folder running? (Windows' process list, through WMI.)
+function GhosttyRunning(): Boolean;
+var
+  Locator, Service, Found: Variant;
+  Path: String;
+begin
+  Result := False;
+  try
+    Path := ExpandConstant('{app}\ghostty.exe');
+    StringChangeEx(Path, '\', '\\', True);
+    Locator := CreateOleObject('WbemScripting.SWbemLocator');
+    Service := Locator.ConnectServer('.', 'root\CIMV2');
+    Found := Service.ExecQuery('SELECT ProcessId FROM Win32_Process WHERE ExecutablePath = ''' + Path + '''');
+    Result := Found.Count > 0;
+  except
+    Log('could not ask WMI whether Ghostty runs: ' + GetExceptionMessage);
+  end;
+end;
+
+function ForceClose(): Boolean;
+begin
+  Result := Pos('/FORCECLOSEAPPLICATIONS', Uppercase(GetCmdTail)) > 0;
+end;
+
+// A silent upgrade never closes a running Ghostty unless asked to: it stops instead (exit 5).
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  if WizardSilent and (not ForceClose) and GhosttyRunning then begin
+    Result := 'Ghostty is running; close it or pass /FORCECLOSEAPPLICATIONS';
+    Log(Result);
+  end;
+end;
