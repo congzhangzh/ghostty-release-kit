@@ -36,8 +36,8 @@ concurrency:
 env:
   ZIG_VERSION: 0.17.1
   # The test jobs the gate requires (and so a release): their job ids. The others run and are
-  # reported. wine-arm64 and windows join once they have proven themselves on candidates.
-  MUST_TEST: wine-x64
+  # reported. wine-arm64 joins once it has proven itself on candidates.
+  MUST_TEST: wine-x64 windows
 
 jobs:
   changes:
