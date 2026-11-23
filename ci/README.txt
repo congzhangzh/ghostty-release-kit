@@ -23,6 +23,13 @@ THIRD-PARTY-NOTICES.txt): ghostty.exe runs the shell in it, so what programs wri
 bracketed paste, the kitty keyboard protocol, graphics, the title, OSC 52) reaches it unchanged.
 Without them, or with GHOSTTY_CONPTY=inbox set, it uses Windows' own console, which drops those.
 
+OpenGL: Ghostty draws with OpenGL 4.3. With a graphics driver that has it, the system's
+OpenGL is used. Without one (a virtual machine's basic display adapter, as in UTM; some
+remote desktops) Ghostty falls back to Mesa's software OpenGL in the opengl folder here (Mesa
+llvmpipe, see THIRD-PARTY-NOTICES.txt): it works everywhere, using the CPU. Keep the opengl
+folder beside ghostty.exe. GHOSTTY_GL=mesa or GHOSTTY_GL=system picks one; "ghostty.exe
+/stats" names the one in use. When neither works, Ghostty says why in a message box.
+
 Full screen: F11 or Ctrl+Enter (the whole monitor, no frame, the taskbar hidden); press it
 again to go back. "fullscreen = true" in the config starts every window in full screen.
 

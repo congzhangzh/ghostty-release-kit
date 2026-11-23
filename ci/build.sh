@@ -10,10 +10,12 @@
 #                                                 (themes, shell integration, terminfo) when the
 #                                                 source has windows/resources.sh, and Microsoft's
 #                                                 conpty.dll, OpenConsole.exe and their
-#                                                 THIRD-PARTY-NOTICES.txt when it side-loads them
+#                                                 THIRD-PARTY-NOTICES.txt when it side-loads them,
+#                                                 and Mesa's opengl\opengl32.dll (software
+#                                                 OpenGL) and its notices when it falls back to it
 # and <out>/SHA256SUMS over the zips. The architectures in MUST_BUILD (default x86_64) must
 # build; another that fails is left out and named in <out>/NOT-BUILT. Needs zig (the version build.zig.zon asks for), zip,
-# curl and python3.
+# curl, python3, and 7z for a source with the Mesa fallback.
 set -euo pipefail
 src=$(cd "$1" && pwd) version=$2 out=$3
 shift 3
@@ -37,6 +39,26 @@ if [ -f "$src/src/os/conpty.zig" ]; then
 	echo "$(pin conpty 4 | sed 's/^sha256://')  $conpty" | sha256sum -c --quiet - ||
 		{ echo "::error::$conpty differs from the SHA-256 in sources.lock" >&2; exit 1; }
 fi
+
+# Mesa's software OpenGL, for a source whose renderer falls back to it when the system's
+# OpenGL is too old (pkg/opengl/wgl.zig: GHOSTTY_GL): mmozeiko/build-mesa's llvmpipe
+# opengl32.dll, one archive per architecture, pinned in sources.lock as mesa-<arch> (name
+# version url sha256:<hex>), fetched once, checked, the DLL left unmodified. mesa <arch>
+# prints the archive's path, empty when the source has no fallback.
+mesa_fallback=
+if [ -f "$src/pkg/opengl/wgl.zig" ] && grep -q GHOSTTY_GL "$src/pkg/opengl/wgl.zig"; then
+	mesa_fallback=1
+	command -v 7z > /dev/null || { echo "::error::7z is needed to unpack Mesa's opengl32.dll" >&2; exit 1; }
+fi
+mesa() {
+	[ -n "$mesa_fallback" ] || return 0
+	local f=$work/mesa-$1-$(pin "mesa-$1" 2).7z
+	[ -n "$(pin "mesa-$1" 3)" ] || { echo "::error::sources.lock has no mesa-$1 line" >&2; return 1; }
+	[ -f "$f" ] || curl -fsSL --retry 3 -o "$f" "$(pin "mesa-$1" 3)"
+	echo "$(pin "mesa-$1" 4 | sed 's/^sha256://')  $f" | sha256sum -c --quiet - ||
+		{ echo "::error::$f differs from the SHA-256 in sources.lock" >&2; return 1; }
+	echo "$f"
+}
 
 # What ghostty.exe's About and What's new show (ci/about.py), passed to windows/build.sh, which
 # embeds them; a host that doesn't know them ignores both. What's new: this release's paragraph
@@ -71,7 +93,7 @@ fi
 # One architecture: libghostty, the host, the package. Run in its own subshell with set -e, so
 # a failure ends that architecture only (set -e does not apply inside an `if` or `||`).
 one() {
-	local arch=$1 name pkg info nu
+	local arch=$1 name pkg info nu mesa7z
 	echo "::group::libghostty $arch"
 	(cd "$src" && zig build -Dtarget="$arch-windows-gnu" -Doptimize=ReleaseFast -Demit-themes=true --prefix "$work/lib-$arch")
 	echo "::endgroup::"
@@ -92,6 +114,7 @@ one() {
 		if [ -n "${WHATSNEW_TEXT:-}" ]; then echo "whatsnew: given to this test build"
 		elif [ -s "$whatsnew" ]; then echo "whatsnew: r${version##*+r}"; fi
 		if [ -n "$family_from" ]; then echo "family: $family_from"; fi
+		if [ -n "$mesa_fallback" ]; then echo "opengl fallback: Mesa $(pin "mesa-$arch" 2) llvmpipe (mmozeiko/build-mesa), opengl\\opengl32.dll"; fi
 	} > "$info"
 	WHATSNEW_FILE=$whatsnew FAMILY_LINE=$family BUILDINFO_FILE=$info "$src/windows/build.sh" "$work/lib-$arch" "$arch" "$work/host-$arch" release
 	cp "$work/host-$arch/ghostty.exe" "$pkg/"
@@ -101,6 +124,16 @@ one() {
 		case $arch in x86_64) nu=x64 ;; aarch64) nu=arm64 ;; esac
 		unzip -q -o -j "$conpty" "runtimes/win-$nu/native/conpty.dll" "build/native/runtimes/$nu/OpenConsole.exe" -d "$pkg"
 		cp "$kit/ci/THIRD-PARTY-NOTICES.txt" "$pkg/"
+	fi
+	# Mesa's opengl32.dll in opengl\, never beside ghostty.exe (there it would win every load of
+	# opengl32.dll by name, the system's too); its notices go after ConPTY's.
+	mesa7z=$(mesa "$arch")
+	if [ -n "$mesa7z" ]; then
+		mkdir -p "$pkg/opengl"
+		7z e -y -bd -o"$pkg/opengl" "$mesa7z" opengl32.dll > /dev/null
+		[ -s "$pkg/opengl/opengl32.dll" ] || { echo "::error::no opengl32.dll in $mesa7z" >&2; exit 1; }
+		[ -f "$pkg/THIRD-PARTY-NOTICES.txt" ] || printf 'Third-party software in this package\n====================================\n' > "$pkg/THIRD-PARTY-NOTICES.txt"
+		cat "$kit/ci/THIRD-PARTY-NOTICES-mesa.txt" >> "$pkg/THIRD-PARTY-NOTICES.txt"
 	fi
 	if [ -f "$work/host-$arch/BUILDINFO.txt" ]; then cp "$work/host-$arch/BUILDINFO.txt" "$pkg/"; fi
 	cp "$src/LICENSE" "$pkg/LICENSE"

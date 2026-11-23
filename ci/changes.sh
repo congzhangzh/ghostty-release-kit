@@ -7,7 +7,7 @@
 # - none: nothing a build reads changed: only docs (*.md, LICENSE) or the comments of
 #   sources.lock. No build, no release.
 # - release: an input of the package changed: a pin line of sources.lock, ci/README.txt,
-#   ci/build.sh or ci/about.py (the kit-key's inputs). Build, test, and publish the rolling release
+#   ci/build.sh, ci/about.py or the notices (the kit-key's inputs). Build, test, and publish the rolling release
 #   (unless that key or version is already released).
 # - test: anything else the build reads (the other scripts, the workflow): build and test,
 #   so the change is proven, but the package is the same, so nothing is published.
@@ -27,7 +27,7 @@ while IFS= read -r path; do
 	case $path in
 	*.md | LICENSE) ;;
 	sources.lock) [ "$(pins "$before")" = "$(pins "$after")" ] || release ;;
-	ci/build.sh | ci/about.py | ci/README.txt) release ;;
+	ci/build.sh | ci/about.py | ci/README.txt | ci/THIRD-PARTY-NOTICES*.txt) release ;;
 	*) scope="test" ;;
 	esac
 done < <(git diff --name-only "$before" "$after")

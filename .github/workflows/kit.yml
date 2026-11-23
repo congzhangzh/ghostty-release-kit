@@ -102,7 +102,7 @@ jobs:
           MUST_BUILD: x86_64 aarch64
           WHATSNEW_TEXT: ${{ inputs.whatsnew }}
         run: |
-          sudo apt-get install -y -q zip > /dev/null
+          sudo apt-get install -y -q zip p7zip-full > /dev/null
           kit/ci/build.sh ghostty "$VERSION" out x86_64 aarch64
 
       - name: The commits, for the release notes
@@ -393,7 +393,7 @@ jobs:
             ;;
           esac
           if ! [[ $tag =~ ^[0-9]{8}\.[0-9]+$ ]]; then echo "::error::no release tag from version $VERSION ($tag)"; exit 1; fi
-          key="ghostty $VERSION ${SHA:0:12}, build.sh $(git -C kit rev-parse --short=12 HEAD:ci/build.sh), README.txt $(git -C kit rev-parse --short=12 HEAD:ci/README.txt), about.py $(git -C kit rev-parse --short=12 HEAD:ci/about.py 2> /dev/null || echo none), zig $ZIG_VERSION"
+          key="ghostty $VERSION ${SHA:0:12}, build.sh $(git -C kit rev-parse --short=12 HEAD:ci/build.sh), README.txt $(git -C kit rev-parse --short=12 HEAD:ci/README.txt), about.py $(git -C kit rev-parse --short=12 HEAD:ci/about.py 2> /dev/null || echo none), notices $(git -C kit rev-parse --short=12 HEAD:ci/THIRD-PARTY-NOTICES-mesa.txt 2> /dev/null || echo none), zig $ZIG_VERSION"
           fork=${SRC#https://github.com/}
           fork=${fork%.git}
           testlog=$(find out/wine-x64 -path '*test-wine*/test.log' | head -1)
