@@ -516,7 +516,9 @@ jobs:
   # already on PyPI (the release was published before) is skipped.
   publish-pypi:
     needs: [publish, pypi, pypi-test]
-    if: needs.publish.result == 'success' && needs.pypi-test.result == 'success' && needs.publish.outputs.tag != ''
+    # Off until the owner turns it on (a new public channel): the repository variable PYPI = on,
+    # after PyPI's pending publisher and the "pypi" environment exist.
+    if: vars.PYPI == 'on' && needs.publish.result == 'success' && needs.pypi-test.result == 'success' && needs.publish.outputs.tag != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: pypi
