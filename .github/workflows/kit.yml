@@ -157,8 +157,12 @@ jobs:
           rc=$?
           cat wine-x64/summary.md >> "$GITHUB_STEP_SUMMARY"
           exit $rc
+      - name: Leave out the Wine prefixes (their dosdevices links reach /, which the upload would walk)
+        if: always()
+        run: find wine-x64 -name wineprefix -type d -prune -exec rm -rf {} + 2> /dev/null || true
       - name: Keep the results
         if: always()
+        continue-on-error: true # the test's verdict is the step above; a lost upload is no test failure
         uses: actions/upload-artifact@v4
         with:
           name: wine-x64
