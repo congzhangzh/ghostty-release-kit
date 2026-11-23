@@ -366,7 +366,7 @@ jobs:
   # On a push to main whose pin or package inputs changed, and only when the gate is green: the
   # rolling release <YYYYMMDD>.<N>, published once and never replaced.
   publish:
-    needs: [changes, build, gate]
+    needs: [changes, build, gate, installer-test]
     outputs:
       tag: ${{ steps.release.outputs.tag }}
     # always(): without a status function GitHub adds success(), which checks every job upstream
@@ -394,6 +394,8 @@ jobs:
       # The installers (installer/ghostty.iss), when they were built; the release goes out
       # without them otherwise.
       - uses: actions/download-artifact@v4
+        # The installers join a release only when installer-test passed on both architectures.
+        if: needs.installer-test.result == 'success'
         continue-on-error: true
         with:
           name: installers
