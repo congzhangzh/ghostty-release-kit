@@ -131,7 +131,7 @@ jobs:
   # typing through ConPTY, drawing, exit), then the rest of ci/wine/ (tabs, themes, the stats
   # pipe, the shell, the title bar and its menu, ConPTY's choices, notifications, About).
   wine-x64:
-    needs: build
+    needs: [build, winprobes]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -143,6 +143,10 @@ jobs:
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
           version: ${{ env.ZIG_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: winprobes
+          path: probes
       - name: Wine (WineHQ stable) and the test tools
         run: ci/wine/install-wine.sh winehq
       - name: Test x86_64 under Wine
@@ -155,8 +159,12 @@ jobs:
           # The helpers (ci/wine/helpers/*.c) are built by run-all.sh with the zig set up above.
           ci/wine/run-all.sh "pkg/ghostty-$VERSION-windows-x86_64" wine-x64 "$tag"
           rc=$?
+          # End to end through the test-control pipe (ci/e2e-wine.sh, ci/winprobe/e2e.c).
+          xvfb-run -a -s "-screen 0 1280x800x24" ci/e2e-wine.sh "pkg/ghostty-$VERSION-windows-x86_64/ghostty.exe" probes/x86_64 wine-x64/e2e > wine-x64/e2e.out 2>&1
+          e2e=$?
+          { echo "| e2e | $([ $e2e = 0 ] && echo PASS || echo "FAIL (exit $e2e)") | | $(tail -1 wine-x64/e2e.out) |"; } >> wine-x64/summary.md
           cat wine-x64/summary.md >> "$GITHUB_STEP_SUMMARY"
-          exit $rc
+          [ $rc = 0 ] && [ $e2e = 0 ]
       - name: Leave out the Wine prefixes (their dosdevices links reach /, which the upload would walk)
         if: always()
         run: find wine-x64 -name wineprefix -type d -prune -exec rm -rf {} + 2> /dev/null || true
