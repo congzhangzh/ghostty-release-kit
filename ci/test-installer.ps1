@@ -27,7 +27,7 @@ $aumid = 'GhosttyForWindows.Ghostty'
 
 function Install([string] $log) {
 	$t = Get-Date
-	$p = Start-Process -FilePath $Setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS', "/LOG=$log") -PassThru -Wait
+	$p = Start-Process -FilePath $Setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/FORCECLOSEAPPLICATIONS', "/LOG=$log") -PassThru -Wait
 	return @($p.ExitCode, [int]((Get-Date) - $t).TotalSeconds)
 }
 
@@ -105,8 +105,8 @@ Start-Sleep -Seconds 4
 $r = Install "$Out\upgrade.log"
 Check ($r[0] -eq 0) "install again over it, Ghostty running: exit $($r[0]) in $($r[1]) s"
 Check (Test-Path "$app\ghostty.exe") "  ghostty.exe still there after the upgrade"
-if (-not $g.HasExited) { Say 'info' "  the running Ghostty was not closed by setup (pid $($g.Id)); stopped now"; Stop-Process -Id $g.Id -Force -ErrorAction SilentlyContinue }
-else { Say 'info' "  the running Ghostty was closed by setup (Restart Manager)" }
+Check $g.HasExited "  setup closed the running Ghostty for the upgrade (Restart Manager, forced)"
+if (-not $g.HasExited) { Stop-Process -Id $g.Id -Force -ErrorAction SilentlyContinue }
 Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Get-Process OpenConsole -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$app*" } | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 1
