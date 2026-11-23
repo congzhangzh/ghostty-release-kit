@@ -102,6 +102,11 @@ public static class W {
 		EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p); if (p == pid && IsWindowVisible(h)) list.Add(h); return true; }, IntPtr.Zero);
 		return list;
 	}
+	public static List<IntPtr> OtherTopWindows(uint pid) {
+		var list = new List<IntPtr>();
+		EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p); if (p != pid && IsWindowVisible(h) && Text(h).Length > 0) list.Add(h); return true; }, IntPtr.Zero);
+		return list;
+	}
 	public static string Text(IntPtr h) { var s = new StringBuilder(512); GetWindowTextW(h, s, 512); return s.ToString(); }
 	public static string Class(IntPtr h) { var s = new StringBuilder(256); GetClassNameW(h, s, 256); return s.ToString(); }
 	// The window station's WSF_VISIBLE flag: 1 on an interactive desktop (WinSta0 of a logged-on
@@ -171,8 +176,10 @@ public static class W {
 			var u = new INPUT { type = 1 }; u.u.ki.wScan = c; u.u.ki.dwFlags = 0x0004 | 0x0002 /* KEYUP */;
 			list.Add(d); list.Add(u);
 		}
-		var ed = new INPUT { type = 1 }; ed.u.ki.wVk = 0x0D;
-		var eu = new INPUT { type = 1 }; eu.u.ki.wVk = 0x0D; eu.u.ki.dwFlags = 0x0002;
+		// Enter with its scan code too: a terminal reads the key from the scan code (run 1:
+		// with wScan 0 the text arrived but the line was never entered).
+		var ed = new INPUT { type = 1 }; ed.u.ki.wVk = 0x0D; ed.u.ki.wScan = 0x1C;
+		var eu = new INPUT { type = 1 }; eu.u.ki.wVk = 0x0D; eu.u.ki.wScan = 0x1C; eu.u.ki.dwFlags = 0x0002;
 		list.Add(ed); list.Add(eu);
 		uint n = 0;
 		foreach (var i in list) { n += SendInput(1, new INPUT[] { i }, Marshal.SizeOf(typeof(INPUT))); System.Threading.Thread.Sleep(15); }
@@ -228,7 +235,8 @@ Get-CimInstance Win32_VideoController | ForEach-Object { Say 'info' "display ada
 foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\OpenGLDrivers', 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\OpenGLDrivers\MSOGL') {
 	if (Test-Path $k) { Say 'info' "registry $k : $((Get-ItemProperty $k | Out-String).Trim() -replace '\s+', ' ')" }
 }
-$appx = @(Get-AppxPackage -Name '*OpenCLOpenGL*' -ErrorAction SilentlyContinue)
+# The Compatibility Pack's package is Microsoft.D3DMappingLayers.
+$appx = @(Get-AppxPackage -Name '*D3DMappingLayers*' -ErrorAction SilentlyContinue)
 Say 'info' "Microsoft's OpenCL/OpenGL Compatibility Pack: $(if ($appx.Count) { $appx[0].Version } else { 'not installed' })"
 
 # --- 2. OpenGL
@@ -285,8 +293,9 @@ foreach ($c in @(@{ n = 'inbox-0'; a = @() }, @{ n = 'inbox-8'; a = @('--flags',
 	if ($c.n -eq 'sideload-0') { Check ($pass -ge 24) "side-loaded ConPTY passes at least 24 sequences unchanged, as on the owner's box ($pass/$all)" }
 	$lines | Where-Object { $_ -match '^(CHANGED|DROPPED)' } | Select-Object -First 30 | ForEach-Object { Say 'info' "  $($c.n): $_" }
 }
-$left = @(Get-Process OpenConsole -ErrorAction SilentlyContinue)
-Check ($left.Count -eq 0) "no OpenConsole.exe left running ($($left.Count))"
+# OpenConsole.exe ends a moment after its pseudoconsole is closed: wait up to 5 s.
+for ($i = 0; $i -lt 10; $i++) { $left = @(Get-Process OpenConsole -ErrorAction SilentlyContinue); if (-not $left.Count) { break }; Start-Sleep -Milliseconds 500 }
+Check ($left.Count -eq 0) "no OpenConsole.exe left running 5 s after the probes ($($left.Count))"
 
 # --- 4. Ghostty starts and draws
 Section '4. Ghostty: start, window, OpenGL, drawing'
@@ -326,7 +335,22 @@ if ($hwnd -ne [IntPtr]::Zero) {
 
 	# --- 5. typing
 	Section '5. Typing: real keys run a command in the shell'
-	$fg = [W]::Front($hwnd)
+	# Windows of other programs that may hold the foreground: listed, and the runner image's
+	# pop-ups closed (run 1 on windows-11-arm: a "Microsoft account" window took the keys
+	# and the clicks).
+	foreach ($o in [W]::OtherTopWindows([uint32]$g.Id)) {
+		$pid2 = [uint32]0; [void][W]::GetWindowThreadProcessId($o, [ref] $pid2)
+		$pn = (Get-Process -Id $pid2 -ErrorAction SilentlyContinue).ProcessName
+		$t = [W]::Text($o)
+		Say 'info' "another window: '$t' ($([W]::Class($o)), $pn)"
+		if ($t -match '^(Microsoft account|Windows Security|Get started|Welcome)') {
+			[void][W]::PostMessageW($o, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CLOSE
+			Say 'info' "  closed it (WM_CLOSE)"
+		}
+	}
+	Start-Sleep -Seconds 1
+	$fg = $false
+	for ($i = 0; $i -lt 5 -and -not $fg; $i++) { $fg = [W]::Front($hwnd); if (-not $fg) { Start-Sleep -Milliseconds 500 } }
 	Check $fg "Ghostty's window is the foreground window (foreground now: '$([W]::Text([W]::GetForegroundWindow()))')"
 	$mark = Join-Path $Out 'typed.txt'
 	$n = [W]::Type("echo typed-in-ghostty> $mark")
@@ -397,7 +421,7 @@ if ($CompatPack) {
 		$t = Get-Date
 		$o = (& winget install --id 9NQPSL29BFFF --source msstore --accept-package-agreements --accept-source-agreements --disable-interactivity 2>&1 | Out-String)
 		Say 'info' "winget exit $LASTEXITCODE in $([int]((Get-Date) - $t).TotalSeconds) s: $(($o -split "`r?`n" | Where-Object { $_ -match '\w' } | Select-Object -Last 3) -join ' | ')"
-		$appx = @(Get-AppxPackage -Name '*OpenCLOpenGL*' -ErrorAction SilentlyContinue)
+		$appx = @(Get-AppxPackage -Name '*D3DMappingLayers*' -ErrorAction SilentlyContinue)
 		Say 'info' "Compatibility Pack now: $(if ($appx.Count) { "$($appx[0].Name) $($appx[0].Version)" } else { 'not installed' })"
 		$d = Join-Path $Out 'gl-compatpack'
 		New-Item -ItemType Directory -Force $d | Out-Null
@@ -410,7 +434,7 @@ if ($CompatPack) {
 
 $logLines = @(Get-Content $log -ErrorAction SilentlyContinue)
 Section "Ghostty's log (warnings, errors; $($logLines.Count) lines)"
-$logLines | Where-Object { $_ -match 'warn|err|fail' } | Select-Object -First 40 | ForEach-Object { Add-Content -Path $results -Value "    $_" -Encoding utf8 }
+$logLines | Where-Object { $_ -match 'warn|err|fail|OpenGL|opengl|conpty|glcheck' } | Select-Object -First 60 | ForEach-Object { Add-Content -Path $results -Value "    $_" -Encoding utf8 }
 
 $secs = [int]((Get-Date) - $script:t0).TotalSeconds
 Add-Content -Path $results -Value "`n**$(if ($script:fails) { "FAIL ($($script:fails))" } else { 'PASS' })** in $secs s" -Encoding utf8
