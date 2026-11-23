@@ -1,0 +1,50 @@
+# ghostty-for-windows: Ghostty for Windows on PyPI, so `uv tool install ghostty-for-windows`
+# works. The package is only a launcher; the build itself (ghostty.exe, ConPTY, Mesa's OpenGL,
+# the resources) goes into one wheel per architecture, win_amd64 and win_arm64, made by
+# pypi/bundle.py from the kit's release zips. The plain wheel `uv build` makes is never
+# published: it has no ghostty.exe.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ghostty-for-windows"
+dynamic = ["version"]
+description = "Ghostty, the terminal emulator, built for Windows (x64 and Arm64): an unofficial build"
+readme = "README.md"
+# The launcher's own licence (the kit's, Apache-2.0); the platform wheels name everything they
+# carry (bundle.py).
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Cong Zhang", email = "13283869+congzhangzh@users.noreply.github.com" }]
+requires-python = ">=3.9"
+dependencies = []
+keywords = ["ghostty", "terminal", "terminal emulator", "windows", "conpty"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Topic :: Terminals :: Terminal Emulators/X Terminals",
+]
+
+[project.urls]
+Homepage = "https://github.com/congzhangzh/ghostty-release-kit"
+Releases = "https://github.com/congzhangzh/ghostty-release-kit/releases"
+Upstream = "https://ghostty.org"
+Issues = "https://github.com/congzhangzh/ghostty-release-kit/issues"
+
+# A GUI script: on Windows it starts without a console window. The command is plain `ghostty`
+# (the owner's pick, 2026-11-23); the ghostty.exe it starts is package data, never on PATH.
+[project.gui-scripts]
+ghostty = "ghostty_for_windows:main"
+
+# The version is the kit release's tag (20261123.1), written into _version.py by the workflow
+# before `uv build`; a checkout says 0.dev0.
+[tool.hatch.version]
+path = "src/ghostty_for_windows/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ghostty_for_windows"]

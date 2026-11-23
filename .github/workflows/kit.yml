@@ -322,7 +322,7 @@ jobs:
   # One verdict per run: every job named in MUST_TEST passed (the other test jobs are reported,
   # not required), and each job's minutes, so the cost of the loop is on every run's page.
   gate:
-    needs: [changes, build, wine-x64, wine-arm64, windows]
+    needs: [changes, build, wine-x64, wine-arm64, windows, pypi-test]
     if: always() && needs.build.result != 'skipped'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -337,7 +337,7 @@ jobs:
             echo
             echo "| job | result | required |"
             echo "|---|---|---|"
-            for j in build wine-x64 wine-arm64 windows; do
+            for j in build wine-x64 wine-arm64 windows pypi-test; do
               r=$(jq -r --arg j "$j" '.[$j].result' <<< "$NEEDS")
               req=no; case " build $MUST_TEST " in *" $j "*) req=yes ;; esac
               echo "| $j | $r | $req |"
@@ -361,6 +361,8 @@ jobs:
   # rolling release <YYYYMMDD>.<N>, published once and never replaced.
   publish:
     needs: [changes, build, gate]
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
     # always(): without a status function GitHub adds success(), which checks every job upstream
     # (also the ones the gate does not require), so a red windows job would skip the release.
     if: always() && needs.gate.result == 'success' && needs.build.outputs.PINNED == 'true' && needs.changes.outputs.scope == 'release' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
@@ -384,6 +386,7 @@ jobs:
           name: wine-x64
           path: out/wine-x64
       - name: Publish the rolling release
+        id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -400,6 +403,7 @@ jobs:
             ;;
           esac
           if ! [[ $tag =~ ^[0-9]{8}\.[0-9]+$ ]]; then echo "::error::no release tag from version $VERSION ($tag)"; exit 1; fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
           key="ghostty $VERSION ${SHA:0:12}, build.sh $(git -C kit rev-parse --short=12 HEAD:ci/build.sh), README.txt $(git -C kit rev-parse --short=12 HEAD:ci/README.txt), about.py $(git -C kit rev-parse --short=12 HEAD:ci/about.py 2> /dev/null || echo none), notices $(git -C kit rev-parse --short=12 HEAD:ci/THIRD-PARTY-NOTICES-mesa.txt 2> /dev/null || echo none), zig $ZIG_VERSION"
           fork=${SRC#https://github.com/}
           fork=${fork%.git}
@@ -431,3 +435,105 @@ jobs:
           cat out/notes.md
           KEY=$key python3 -I kit/ci/publish-release.py "$tag" "$GITHUB_SHA" \
             "Ghostty for Windows $tag" out/notes.md out/*.zip out/SHA256SUMS
+
+  # ghostty-for-windows on PyPI (pypi/): the launcher package, repacked into one wheel per
+  # architecture with the build's whole zip inside (pypi/bundle.py). Its version is the
+  # release's tag (20261123.1, from the version's +r part); a test build is 0.dev<run>.
+  pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VERSION: ${{ needs.build.outputs.VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ghostty-${{ needs.build.outputs.VERSION }}
+          path: out
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: Build the wheels (win_amd64, win_arm64)
+        run: |
+          case $VERSION in
+          *+r[0-9]*) v=${VERSION##*+r} ;;
+          *) v=0.dev$GITHUB_RUN_NUMBER ;;
+          esac
+          echo "__version__ = \"$v\"" > pypi/src/ghostty_for_windows/_version.py
+          (cd pypi && uv build --wheel -o ../plain)
+          python3 -I pypi/bundle.py plain/ghostty_for_windows-*-py3-none-any.whl wheels out/*-windows-*.zip
+          uvx twine check wheels/*.whl
+          ls -l wheels
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pypi-wheels
+          path: wheels/
+
+  # Each wheel installed as a user would (uv tool install, from the folder of wheels, so uv
+  # picks the wheel of the machine), then its command, `ghostty`, asked for /buildinfo; and
+  # once more as uvx runs it, without installing.
+  pypi-test:
+    needs: pypi
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [windows-latest, windows-11-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pypi-wheels
+          path: wheels
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: uv tool install, then ghostty /buildinfo
+        shell: pwsh
+        run: |
+          $v = (Get-ChildItem wheels -Filter *.whl | Select-Object -First 1).Name.Split('-')[1]
+          uv tool install --no-index --find-links wheels "ghostty-for-windows==$v"
+          if ($LASTEXITCODE) { throw "uv tool install failed" }
+          $dir = (uv tool dir).Trim()
+          $exe = Get-ChildItem "$dir\ghostty-for-windows" -Recurse -Filter ghostty.exe | Select-Object -First 1
+          $b = [IO.File]::ReadAllBytes($exe.FullName); $pe = [BitConverter]::ToInt32($b, 0x3C)
+          "installed: $($exe.FullName), machine 0x{0:X4}" -f [BitConverter]::ToUInt16($b, $pe + 4)
+          $bin = (uv tool dir --bin).Trim()
+          $cmd = Get-Command ghostty -ErrorAction SilentlyContinue
+          "ghostty on PATH: $($cmd.Source) (uv's tool bin: $bin)"
+          $p = Start-Process -FilePath "$bin\ghostty.exe" -ArgumentList '/buildinfo' -RedirectStandardOutput installed.txt -NoNewWindow -PassThru -Wait
+          $text = Get-Content installed.txt -Raw
+          "--- ghostty /buildinfo (exit $($p.ExitCode)):"; $text
+          if ($text -notmatch 'version: ') { throw "ghostty /buildinfo printed no version line" }
+          $p = Start-Process -FilePath uvx -ArgumentList @('--no-index', '--find-links', 'wheels', '--from', "ghostty-for-windows==$v", 'ghostty', '/buildinfo') -RedirectStandardOutput uvx.txt -NoNewWindow -PassThru -Wait
+          $text = Get-Content uvx.txt -Raw
+          "--- uvx --from ghostty-for-windows ghostty /buildinfo (exit $($p.ExitCode)):"; $text
+          if ($text -notmatch 'version: ') { throw "uvx ... ghostty /buildinfo printed no version line" }
+          "ok: ghostty starts the bundled ghostty.exe, installed and by uvx"
+          "| wheel | runner | result |" >> $env:GITHUB_STEP_SUMMARY
+          "|---|---|---|" >> $env:GITHUB_STEP_SUMMARY
+          "| ghostty-for-windows $v | ${{ matrix.runner }} | /buildinfo ok |" >> $env:GITHUB_STEP_SUMMARY
+
+  # After the GitHub release, by trusted publishing (no token): PyPI's publisher for this
+  # project names this repository, this workflow (kit.yml) and the environment "pypi". A wheel
+  # already on PyPI (the release was published before) is skipped.
+  publish-pypi:
+    needs: [publish, pypi, pypi-test]
+    if: needs.publish.result == 'success' && needs.pypi-test.result == 'success' && needs.publish.outputs.tag != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pypi-wheels
+          path: wheels
+      - name: The wheels are this release's
+        env:
+          TAG: ${{ needs.publish.outputs.tag }}
+        run: |
+          ls wheels
+          for w in wheels/*.whl; do case $(basename "$w") in ghostty_for_windows-"$TAG"-py3-none-win_*.whl) ;; *) echo "::error::$w is not version $TAG"; exit 1 ;; esac; done
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: wheels/
+          skip-existing: true
