@@ -401,6 +401,9 @@ jobs:
           {
             echo "Ghostty \`$VERSION\` for Windows, built by ghostty-release-kit \`${GITHUB_SHA:0:12}\` from [\`$REF\`](https://github.com/$fork/tree/$REF) @ \`${SHA:0:12}\` with Zig $ZIG_VERSION, and tested under Wine. An early, unofficial build."
             echo
+            # What's new: the release's own sources.lock paragraph, the text ghostty.exe shows.
+            whatsnew=$(python3 -I kit/ci/about.py whatsnew kit/sources.lock "$VERSION")
+            if [ -n "$whatsnew" ]; then echo "**What's new:** $whatsnew"; echo; fi
             cat out/commits.md
             echo
             echo "**Tests** (\`ci/test-wine.sh\`, x86_64 under Wine with Mesa llvmpipe; the full set: \`ci/wine/\`, all required by the gate):"
