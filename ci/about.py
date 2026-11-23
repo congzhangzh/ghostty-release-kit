@@ -6,7 +6,8 @@
 
 whatsnew: sources.lock describes every release in its header, one paragraph each, starting
 "#   r<YYYYMMDD>.<N>: ...". For a version <upstream>+r<YYYYMMDD>.<N> this prints that paragraph as
-plain text (the "# " comment marks and the release name taken off, lines joined). No paragraph
+plain text (the "# " comment marks and the release name taken off, lines joined; a line that
+starts "- " starts a new line, one item per line). No paragraph
 (a test build, a version without +r) prints nothing and exits 0.
 
 family: py-screen's src/py_screen/about.py says SLOGAN = f"{MOTTO} · <family line>". This reads
@@ -47,7 +48,17 @@ def whatsnew(lock_path: str, version: str) -> str:
             if not cont:
                 break
             out.append(cont.group(1))
-    return " ".join(s.strip() for s in out if s.strip())
+    # Lines are joined with spaces; a line starting "- " starts a new line of the text (one item
+    # per line in the What's new window and on the release page), so does the paragraph's first.
+    text: list[str] = []
+    for s in (s.strip() for s in out):
+        if not s:
+            continue
+        if s.startswith("- ") or not text:
+            text.append(s)
+        else:
+            text[-1] += " " + s
+    return "\n".join(text)
 
 
 def family(about_path: str) -> str:

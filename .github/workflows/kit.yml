@@ -403,7 +403,7 @@ jobs:
             echo
             # What's new: the release's own sources.lock paragraph, the text ghostty.exe shows.
             whatsnew=$(python3 -I kit/ci/about.py whatsnew kit/sources.lock "$VERSION")
-            if [ -n "$whatsnew" ]; then echo "**What's new:** $whatsnew"; echo; fi
+            if [ -n "$whatsnew" ]; then echo "**What's new:**"; echo; printf '%s\n' "$whatsnew"; echo; fi
             cat out/commits.md
             echo
             echo "**Tests** (\`ci/test-wine.sh\`, x86_64 under Wine with Mesa llvmpipe; the full set: \`ci/wine/\`, all required by the gate):"
