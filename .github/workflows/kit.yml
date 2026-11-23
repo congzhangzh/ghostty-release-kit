@@ -164,3 +164,102 @@ jobs:
           cat out/notes.md
           KEY=$key python3 -I kit/ci/publish-release.py "$tag" "$GITHUB_SHA" \
             "Ghostty for Windows $tag" out/notes.md out/*.zip out/SHA256SUMS
+
+  # The probes the Windows job runs (ci/winprobe/*.c), cross-compiled here with the same Zig, one
+  # set per architecture; seconds of work, so it runs beside the build.
+  winprobes:
+    needs: changes
+    if: needs.changes.outputs.scope != 'none'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: ${{ env.ZIG_VERSION }}
+      - name: Build the probes (x86_64 and aarch64)
+        run: |
+          for a in x86_64 aarch64; do
+            mkdir -p probes/$a
+            zig cc -target $a-windows-gnu -O2 ci/winprobe/glprobe.c -lopengl32 -lgdi32 -luser32 -o probes/$a/glprobe.exe
+            zig cc -target $a-windows-gnu -O2 ci/winprobe/conpty-probe.c -o probes/$a/conpty-probe.exe
+            zig cc -target $a-windows-gnu -O2 ci/winprobe/emit.c -o probes/$a/emit.exe
+          done
+          rm -f probes/*/*.pdb
+          ls -l probes/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: winprobes
+          path: probes/
+
+  # The build on real Windows, which Wine can't show: an interactive desktop or not, the OpenGL
+  # the machine gives (and Mesa's software one beside ghostty.exe when that is below 4.3), the
+  # side-loaded ConPTY against the in-box one (conpty-probe), Ghostty starting, drawing, typing
+  # through ConPTY, and the caption buttons of the maximized window clicked with real mouse input
+  # (ci/test-windows.ps1). windows-11-arm is free for public repositories. Results go to the job
+  # summary as text.
+  windows:
+    needs: [build, winprobes]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-11-arm
+            arch: aarch64
+            mesa: arm64
+          - runner: windows-latest
+            arch: x86_64
+            mesa: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ghostty-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: winprobes
+          path: probes
+      - name: Mesa's software OpenGL (mmozeiko/build-mesa 26.3.1, llvmpipe and d3d12), checked
+        shell: pwsh
+        run: |
+          # Pinned by SHA-256 (the release's own digests). Only for the test: it shows whether
+          # an opengl32.dll beside ghostty.exe gives the 4.3 core context a machine without a
+          # GPU driver lacks (a VM's basic display adapter, as on UTM).
+          $pins = @{
+            'llvmpipe-arm64' = 'c74c960c0416f3fa7f55dd877c34bbb1408f097cdf20a5638cd10ac1c90ae3c5'
+            'd3d12-arm64'    = 'd55141861f4f3c9b1495a20830184926f012dc52ac756860707fddf60e15b0ba'
+            'llvmpipe-x64'   = '08145a3717e0c1be0d97b74b53070f14eb39cb2f7de22f84fe20d1a581299c12'
+            'd3d12-x64'      = '844d490ff220409218b89c9ece52eb4d3674a9bd3786fddbec288c12da606712'
+          }
+          foreach ($k in 'llvmpipe', 'd3d12') {
+            $n = "$k-${{ matrix.mesa }}"
+            $f = "mesa-$n-26.3.1.7z"
+            curl.exe -fsSL --retry 3 -o $f "https://github.com/mmozeiko/build-mesa/releases/download/26.3.1/$f"
+            $h = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
+            if ($h -ne $pins[$n]) { throw "$f differs from its pin ($h)" }
+            New-Item -ItemType Directory -Force "mesa/$k" | Out-Null
+            if (Get-Command 7z -ErrorAction SilentlyContinue) { 7z x -y -o"mesa/$k" $f opengl32.dll | Out-Null }
+            else { tar -xf $f -C "mesa/$k" opengl32.dll }
+            Get-ChildItem "mesa/$k"
+          }
+      - name: Test on real Windows (${{ matrix.runner }}, ${{ matrix.arch }})
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist -Filter "*-windows-${{ matrix.arch }}.zip" | Select-Object -First 1
+          if (-not $zip) { throw "no ${{ matrix.arch }} zip in the build artifact: $((Get-ChildItem dist).Name -join ', ')" }
+          ./ci/test-windows.ps1 -Zip $zip.FullName -Probes probes/${{ matrix.arch }} -Out wintest -Mesa mesa -CompatPack
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wintest-${{ matrix.arch }}
+          path: |
+            wintest/results.md
+            wintest/ghostty.log
+            wintest/conpty-*.txt
+            wintest/gl-*/glprobe.txt
+          if-no-files-found: ignore
