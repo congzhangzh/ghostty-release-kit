@@ -127,18 +127,28 @@ public static class W {
 	// What the window shows, by PrintWindow(PW_RENDERFULLCONTENT) into a 32-bit DIB: the number of
 	// distinct colours and the share of pixels not the most common colour. A window that never
 	// drew is one colour (black or white). Also an FNV hash, to see a change between two grabs.
-	public static string Grab(IntPtr h, out ulong hash) {
+	public static string Grab(IntPtr h, out ulong hash) { return GrabTo(h, null, out hash); }
+	// The same, and when `bmp` is given, the pixels saved there as a 32-bit BMP.
+	public static string GrabTo(IntPtr h, string bmp, out ulong hash) {
 		RECT r; GetWindowRect(h, out r);
 		int w = r.R - r.L, ht = r.B - r.T; hash = 0;
 		if (w <= 0 || ht <= 0) return "empty rect";
 		IntPtr sdc = GetDC(IntPtr.Zero), mdc = CreateCompatibleDC(sdc);
 		var bi = new BITMAPINFOHEADER { biSize = 40, biWidth = w, biHeight = -ht, biPlanes = 1, biBitCount = 32 };
-		IntPtr bits; IntPtr bmp = CreateDIBSection(mdc, ref bi, 0, out bits, IntPtr.Zero, 0);
-		IntPtr old = SelectObject(mdc, bmp);
+		IntPtr bits; IntPtr dib = CreateDIBSection(mdc, ref bi, 0, out bits, IntPtr.Zero, 0);
+		IntPtr old = SelectObject(mdc, dib);
 		bool ok = PrintWindow(h, mdc, 2 /* PW_RENDERFULLCONTENT */);
 		int[] px = new int[w * ht];
 		Marshal.Copy(bits, px, 0, px.Length);
-		SelectObject(mdc, old); DeleteObject(bmp); DeleteDC(mdc); ReleaseDC(IntPtr.Zero, sdc);
+		SelectObject(mdc, old); DeleteObject(dib); DeleteDC(mdc); ReleaseDC(IntPtr.Zero, sdc);
+		if (bmp != null) {
+			using (var f = new System.IO.BinaryWriter(System.IO.File.Create(bmp))) {
+				int size = 54 + px.Length * 4;
+				f.Write((ushort)0x4D42); f.Write(size); f.Write(0); f.Write(54);
+				f.Write(40); f.Write(w); f.Write(-ht); f.Write((ushort)1); f.Write((ushort)32); f.Write(0); f.Write(px.Length * 4); f.Write(2835); f.Write(2835); f.Write(0); f.Write(0);
+				foreach (int p in px) f.Write(p);
+			}
+		}
 		var counts = new Dictionary<int, int>();
 		ulong f = 1469598103934665603UL;
 		foreach (int p in px) { int c = p & 0xFFFFFF; int k; counts.TryGetValue(c, out k); counts[c] = k + 1; f = (f ^ (uint)c) * 1099511628211UL; }
@@ -293,9 +303,14 @@ foreach ($c in @(@{ n = 'inbox-0'; a = @() }, @{ n = 'inbox-8'; a = @('--flags',
 	if ($c.n -eq 'sideload-0') { Check ($pass -ge 24) "side-loaded ConPTY passes at least 24 sequences unchanged, as on the owner's box ($pass/$all)" }
 	$lines | Where-Object { $_ -match '^(CHANGED|DROPPED)' } | Select-Object -First 30 | ForEach-Object { Say 'info' "  $($c.n): $_" }
 }
-# OpenConsole.exe ends a moment after its pseudoconsole is closed: wait up to 5 s.
-for ($i = 0; $i -lt 10; $i++) { $left = @(Get-Process OpenConsole -ErrorAction SilentlyContinue); if (-not $left.Count) { break }; Start-Sleep -Milliseconds 500 }
-Check ($left.Count -eq 0) "no OpenConsole.exe left running 5 s after the probes ($($left.Count))"
+# OpenConsole.exe ends a moment after its pseudoconsole is closed: wait up to 15 s (run 2 on x64:
+# one was still there after 5 s), then say which ones are left.
+for ($i = 0; $i -lt 30; $i++) { $left = @(Get-Process OpenConsole -ErrorAction SilentlyContinue); if (-not $left.Count) { break }; Start-Sleep -Milliseconds 500 }
+foreach ($o in $left) {
+	$ci = Get-CimInstance Win32_Process -Filter "ProcessId = $($o.Id)" -ErrorAction SilentlyContinue
+	Say 'info' "OpenConsole.exe still running: pid $($o.Id), started $($o.StartTime.ToString('HH:mm:ss.fff')), parent $($ci.ParentProcessId), $($ci.CommandLine)"
+}
+Check ($left.Count -eq 0) "no OpenConsole.exe left running 15 s after the probes ($($left.Count))"
 
 # --- 4. Ghostty starts and draws
 Section '4. Ghostty: start, window, OpenGL, drawing'
@@ -343,9 +358,12 @@ if ($hwnd -ne [IntPtr]::Zero) {
 		$pn = (Get-Process -Id $pid2 -ErrorAction SilentlyContinue).ProcessName
 		$t = [W]::Text($o)
 		Say 'info' "another window: '$t' ($([W]::Class($o)), $pn)"
-		if ($t -match '^(Microsoft account|Windows Security|Get started|Welcome)') {
+		if ($t -match '^(Microsoft account|Windows Security|Get started|Welcome|System Properties)') {
+			# Run 2: WM_CLOSE did not end windows-11-arm's "Microsoft account" (Shell_OOBEProxy, a
+			# window of Explorer's), so it is also hidden, which takes it out of the foreground.
 			[void][W]::PostMessageW($o, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CLOSE
-			Say 'info' "  closed it (WM_CLOSE)"
+			[void][W]::ShowWindow($o, 0)  # SW_HIDE
+			Say 'info' "  closed and hidden (WM_CLOSE, SW_HIDE)"
 		}
 	}
 	Start-Sleep -Seconds 1
@@ -358,7 +376,7 @@ if ($hwnd -ne [IntPtr]::Zero) {
 	for ($i = 0; $i -lt 20 -and -not (Test-Path $mark); $i++) { Start-Sleep -Milliseconds 500 }
 	Check ((Test-Path $mark) -and ((Get-Content $mark -Raw) -match 'typed-in-ghostty')) 'keys reached the shell through ConPTY: the command wrote its file'
 	Start-Sleep -Seconds 1
-	$h2 = [uint64]0; $grab2 = [W]::Grab($hwnd, [ref] $h2)
+	$h2 = [uint64]0; $grab2 = [W]::GrabTo($hwnd, (Join-Path $Out 'after-typing.bmp'), [ref] $h2)
 	Say 'info' "after typing: $grab2"
 	Check ($h2 -ne $h1) 'the window changed after typing (it redraws)'
 
