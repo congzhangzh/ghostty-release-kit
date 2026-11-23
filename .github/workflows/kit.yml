@@ -317,6 +317,9 @@ jobs:
             wintest/conpty-*.txt
             wintest/gl-*/glprobe.txt
             wintest/e2e/*.log
+            wintest/fonts/ghostty.log
+            wintest/fonts/shot.png
+            wintest/fonts.stdout
           if-no-files-found: ignore
 
   # One verdict per run: every job named in MUST_TEST passed (the other test jobs are reported,

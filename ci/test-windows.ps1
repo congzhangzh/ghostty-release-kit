@@ -431,6 +431,29 @@ if (-not $hasPipe -or -not (Test-Path "$Probes\e2e.exe")) {
 	Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 }
 
+# --- 9. Fonts: which face Windows' own fonts give Ghostty for Chinese, Japanese and emoji
+# (ci/fonts-test.sh, lane A's: types a line of Chinese, Japanese and emoji through the test pipe, reads the
+# log's "found codepoint ... in fallback face=" lines and counts coloured pixels in a pane
+# screenshot). Natively under Git Bash (RUN= : no Wine; --ctl, since MSYS rewrites a leading /);
+# it needs a ghostty.exe whose --ctl takes the request from the wide command line. A
+# measurement for now: its lines are info.
+Section '9. Fonts (ci/fonts-test.sh: CJK and emoji with Windows'' own fonts)'
+$bash = @("$env:ProgramFiles\Git\bin\bash.exe", "$env:ProgramFiles\Git\usr\bin\bash.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+$py = (Get-Command python -ErrorAction SilentlyContinue).Source
+if (-not $hasPipe -or -not $bash -or -not $py) {
+	Say 'info' "not tried: $(if (-not $hasPipe) { 'no test-control pipe' } elseif (-not $bash) { 'no Git Bash' } else { 'no python' })"
+} else {
+	Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+	$fontsOut = Join-Path $Out 'fonts'
+	$script = (Resolve-Path (Join-Path $PSScriptRoot 'fonts-test.sh')).Path -replace '\\', '/'
+	$env:RUN = ''; $env:PY = 'python'; $env:PYTHONUTF8 = '1'
+	$p = Start-Process -FilePath $bash -ArgumentList @($script, ($exe.FullName -replace '\\', '/'), ($fontsOut -replace '\\', '/')) -NoNewWindow -PassThru -RedirectStandardOutput "$Out\fonts.stdout" -RedirectStandardError "$Out\fonts.stderr"
+	if (-not $p.WaitForExit(240000)) { $p.Kill(); Say 'info' 'fonts: no exit in 240 s' }
+	Remove-Item Env:RUN, Env:PY -ErrorAction SilentlyContinue
+	foreach ($l in @(Get-Content "$Out\fonts.stdout" -Encoding utf8 -ErrorAction SilentlyContinue)) { if ($l.Trim()) { Say 'info' "fonts: $l" } }
+	Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+}
+
 # --- 7. Microsoft's Compatibility Pack (GL on D3D12), last: it changes the machine
 if ($CompatPack) {
 	Section "7. Microsoft's OpenCL, OpenGL and Vulkan Compatibility Pack (Store 9NQPSL29BFFF, by winget)"
