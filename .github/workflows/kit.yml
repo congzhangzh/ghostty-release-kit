@@ -351,7 +351,9 @@ jobs:
   # rolling release <YYYYMMDD>.<N>, published once and never replaced.
   publish:
     needs: [changes, build, gate]
-    if: needs.gate.result == 'success' && needs.build.outputs.PINNED == 'true' && needs.changes.outputs.scope == 'release' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    # always(): without a status function GitHub adds success(), which checks every job upstream
+    # (also the ones the gate does not require), so a red windows job would skip the release.
+    if: always() && needs.gate.result == 'success' && needs.build.outputs.PINNED == 'true' && needs.changes.outputs.scope == 'release' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
