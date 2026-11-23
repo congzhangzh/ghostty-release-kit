@@ -463,6 +463,15 @@ jobs:
           python3 -I pypi/bundle.py plain/ghostty_for_windows-*-py3-none-any.whl wheels out/*-windows-*.zip
           uvx twine check wheels/*.whl
           ls -l wheels
+          # Each wheel's size and the release's total: what one release adds to the PyPI project.
+          {
+            echo "### PyPI wheels of this build"
+            echo
+            echo "| wheel | MB |"
+            echo "|---|---|"
+            for w in wheels/*.whl; do echo "| $(basename "$w") | $(python3 -I -c "import os,sys; print(f'{os.path.getsize(sys.argv[1]) / 1e6:.1f}')" "$w") |"; done
+            echo "| **this release adds** | $(python3 -I -c "import glob,os; print(f'{sum(os.path.getsize(w) for w in glob.glob(\"wheels/*.whl\")) / 1e6:.1f}')") |"
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: pypi-wheels
