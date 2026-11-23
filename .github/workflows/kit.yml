@@ -539,3 +539,15 @@ jobs:
         with:
           packages-dir: wheels/
           skip-existing: true
+      - name: The project's size on PyPI (limit 10 GB; warn at 7 GB, to ask PyPI for more in time)
+        if: always()
+        run: |
+          # PyPI's JSON API lists every file of every release with its size; the CDN may lag a
+          # minute behind the upload, so a just-uploaded release can be missing from the sum.
+          bytes=$(curl -fsSL --retry 3 https://pypi.org/pypi/ghostty-for-windows/json |
+            python3 -I -c 'import json,sys; d=json.load(sys.stdin); print(sum(f["size"] for r in d["releases"].values() for f in r))')
+          gb=$(python3 -I -c "print(f'{$bytes / 1e9:.2f}')")
+          echo "### PyPI: ghostty-for-windows is $gb GB of its 10 GB limit" >> "$GITHUB_STEP_SUMMARY"
+          if python3 -I -c "import sys; sys.exit(0 if $bytes >= 7e9 else 1)"; then
+            echo "::warning::ghostty-for-windows on PyPI is $gb GB, past 7 GB of the 10 GB limit: ask PyPI for more"
+          fi
