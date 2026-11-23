@@ -290,9 +290,13 @@ Check ($left.Count -eq 0) "no OpenConsole.exe left running ($($left.Count))"
 
 # --- 4. Ghostty starts and draws
 Section '4. Ghostty: start, window, OpenGL, drawing'
-if (-not $gl['in-box'] -and $gl['Mesa llvmpipe']) {
+# The package brings Mesa in opengl\ when its source falls back to it (wgl.zig). Without it
+# (an older build) and with the in-box OpenGL below 4.3, Mesa's llvmpipe is put there for the test.
+if (Test-Path "$pkg\opengl\opengl32.dll") {
+	Say 'info' "the package has Mesa's opengl\opengl32.dll ($(Machine "$pkg\opengl\opengl32.dll"), $((Get-Item "$pkg\opengl\opengl32.dll").Length) bytes)"
+} elseif (-not $gl['in-box'] -and $gl['Mesa llvmpipe']) {
 	Copy-Item "$Mesa\llvmpipe\opengl32.dll" $pkg
-	Say 'info' "the in-box OpenGL is below 4.3: Mesa's llvmpipe opengl32.dll put beside ghostty.exe"
+	Say 'info' "the in-box OpenGL is below 4.3 and the package has no opengl\: Mesa's llvmpipe opengl32.dll put beside ghostty.exe (an older build)"
 }
 Copy-Item "$Probes\emit.exe" $pkg
 $log = Join-Path $Out 'ghostty.log'
@@ -312,6 +316,8 @@ if ($hwnd -ne [IntPtr]::Zero) {
 	$logText = Get-Content $log -Raw -ErrorAction SilentlyContinue
 	$m = [regex]::Match("$logText", 'loaded OpenGL \d+\.\d+')
 	Check $m.Success "the renderer loaded OpenGL ($(if ($m.Success) { $m.Value } else { 'no "loaded OpenGL" line' }))"
+	$which = [regex]::Match("$logText", 'OpenGL: (the system.s|Mesa.s) opengl32\.dll[^\r\n]*')
+	Say 'info' "which opengl32.dll: $(if ($which.Success) { $which.Value } else { 'not logged (a build without the fallback)' })"
 	$cp = [regex]::Matches("$logText", 'conpty\): [^\r\n]*') | Select-Object -First 2 | ForEach-Object Value
 	Say 'info' "ConPTY: $($cp -join ' / ')"
 	$h1 = [uint64]0; $grab1 = [W]::Grab($hwnd, [ref] $h1)
