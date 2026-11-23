@@ -2,10 +2,14 @@
 # install silently, check what it made, start ghostty.exe, install over it (an upgrade in place),
 # uninstall silently, check that nothing of it is left.
 #
-#   pwsh -File ci/test-installer.ps1 -Setup <ghostty-...-setup.exe> [-Out <dir>]
+#   pwsh -File ci/test-installer.ps1 -Setup <ghostty-...-setup.exe> [-Out <dir>] [-Probes <dir>]
+#
+# With -Probes (e2e.exe and emit.exe of this architecture) the installed Ghostty also runs the
+# end-to-end test: installed, it takes the shortcut's AppUserModelID, so its notifications are
+# WinRT toasts; its log must say so.
 #
 # "ok|FAIL|info  <what>" lines, also into the job summary; exit 1 on a FAIL.
-param([Parameter(Mandatory)] [string] $Setup, [string] $Out = 'installer-test')
+param([Parameter(Mandatory)] [string] $Setup, [string] $Out = 'installer-test', [string] $Probes = '')
 $ErrorActionPreference = 'Continue'
 New-Item -ItemType Directory -Force $Out | Out-Null
 $Out = (Resolve-Path $Out).Path
@@ -57,6 +61,21 @@ foreach ($m in $menus) {
 $p = Start-Process -FilePath "$app\ghostty.exe" -ArgumentList '/buildinfo' -RedirectStandardOutput "$Out\buildinfo.txt" -NoNewWindow -PassThru -Wait
 $bi = Get-Content "$Out\buildinfo.txt" -Raw -ErrorAction SilentlyContinue
 Check ($bi -match 'version: ') "the installed ghostty.exe /buildinfo: $((($bi -split "`r?`n") | Where-Object { $_ -match '^(version|release):' }) -join '; ')"
+
+# 2b. installed, notifications are toasts: e2e.exe against the installed ghostty.exe (a
+# notification from a split's unfocused pane is shown), then its log
+if ($Probes -and (Test-Path "$Probes\e2e.exe")) {
+	$e2eOut = Join-Path $Out 'e2e'
+	$p = Start-Process -FilePath "$Probes\e2e.exe" -ArgumentList @("$app\ghostty.exe", $e2eOut, "$Probes\emit.exe") -NoNewWindow -PassThru -RedirectStandardOutput "$Out\e2e.stdout"
+	if (-not $p.WaitForExit(240000)) { $p.Kill(); Say 'FAIL' 'e2e: no exit in 240 s' }
+	Get-Content "$Out\e2e.stdout" -ErrorAction SilentlyContinue | Where-Object { $_ -match '^(ok|FAIL)\s' } | ForEach-Object { if ($_ -match '^FAIL') { Say 'FAIL' "e2e: $($_.Substring(5))"; $script:fails++ } else { Say 'ok' "e2e: $($_.Substring(5))" } }
+	$log = Get-Content "$e2eOut\ghostty.log" -ErrorAction SilentlyContinue
+	$init = $log | Where-Object { $_ -match 'notify: AppUserModelID' } | Select-Object -First 1
+	Check ($init -match ': toasts$') "installed, Ghostty takes the AppUserModelID and a toast notifier: $init"
+	$shown = $log | Where-Object { $_ -match 'notify: toast ' } | Select-Object -First 1
+	Check ($shown -match 'toast shown') "a notification is a WinRT toast: $shown"
+	Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+} else { Say 'info' 'no -Probes: the toast check is not run' }
 
 # 3. an upgrade in place: the same setup again, while Ghostty runs
 $g = Start-Process -FilePath "$app\ghostty.exe" -PassThru

@@ -22,6 +22,7 @@ static FILE *g_log, *g_wire;
 static int g_fails;
 static HANDLE g_pipe = INVALID_HANDLE_VALUE;
 static int g_id;
+static int g_pwsh = 1; /* the shell takes PowerShell's & form; found by the first notification */
 
 static void say(const char *kind, const char *fmt, ...) {
 	char msg[4096];
@@ -135,6 +136,20 @@ static char *wait_event(long *since, int ms, ...) {
 	return NULL;
 }
 
+/* Type a line into pane `pane` (or the focused one when < 0): as text, then Enter as a key. */
+static void type_line_in(int pane, const char *text) {
+	char esc[2048], where[32] = "";
+	size_t o = 0;
+	for (const char *p = text; *p && o + 3 < sizeof esc; p++) {
+		if (*p == '"' || *p == '\\') esc[o++] = '\\';
+		esc[o++] = *p;
+	}
+	esc[o] = 0;
+	if (pane >= 0) snprintf(where, sizeof where, ",\"pane\":%d", pane);
+	free(ctl("{\"cmd\":\"text\",\"text\":\"%s\"%s}", esc, where));
+	free(ctl("{\"cmd\":\"key\",\"key\":\"enter\"%s}", where));
+}
+
 /* Type a line into the focused pane: as text (a paste), then Enter as a key. */
 static void type_line(const char *text) {
 	char esc[2048];
@@ -237,7 +252,7 @@ int main(int argc, char **argv) {
 		int pwsh = 1;
 		char *e = wait_event(&since, 8000, "\"kind\":\"notification\"", "e2e note", NULL);
 		if (!e) {
-			pwsh = 0;
+			pwsh = g_pwsh = 0;
 			snprintf(line, sizeof line, "\"%s\" \"\\e]9;e2e note\\e\\\\\"", emit);
 			type_line(line);
 			e = wait_event(&since, 8000, "\"kind\":\"notification\"", "e2e note", NULL);
@@ -282,6 +297,18 @@ int main(int argc, char **argv) {
 	r = wait_text(-1, ">", 1, 20000);
 	if (has(r, ">")) OK("the split's shell prompt"); else FAIL("the split's shell prompt: %.200s", r ? r : "no answer");
 	free(r);
+
+	/* A notification from the split's other pane, the one not focused: shown (macOS: only the
+	   focused surface of the key window is quiet). ids[1] is the second tab's first pane. */
+	if (emit && n == 3) {
+		char line[MAX_PATH * 2 + 64];
+		snprintf(line, sizeof line, "%s\"%s\" \"\\e]9;e2e from the other pane\\e\\\\\"", g_pwsh ? "& " : "", emit);
+		type_line_in(ids[1], line);
+		char *e = wait_event(&since, 10000, "\"kind\":\"notification\"", "e2e from the other pane", NULL);
+		if (e && has(e, "\"shown\":true")) OK("a notification from the split's unfocused pane is shown: %.200s", e);
+		else FAIL("a notification from the split's unfocused pane: %.300s", e ? e : "no event in 10 s");
+		free(e);
+	}
 
 	/* Resize: the grid follows. */
 	r = ctl("{\"cmd\":\"read\"}");

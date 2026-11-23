@@ -630,7 +630,7 @@ jobs:
   # start ghostty.exe, install over it while it runs, uninstall silently, nothing left
   # (ci/test-installer.ps1).
   installer-test:
-    needs: installer
+    needs: [installer, winprobes]
     strategy:
       fail-fast: false
       matrix:
@@ -647,12 +647,16 @@ jobs:
         with:
           name: installers
           path: installers
+      - uses: actions/download-artifact@v4
+        with:
+          name: winprobes
+          path: probes
       - name: Install, run, upgrade, uninstall (${{ matrix.arch }})
         shell: pwsh
         run: |
           $setup = Get-ChildItem installers -Filter "*-windows-${{ matrix.arch }}-setup.exe" | Select-Object -First 1
           if (-not $setup) { throw "no ${{ matrix.arch }} installer" }
-          ./ci/test-installer.ps1 -Setup $setup.FullName -Out installer-test
+          ./ci/test-installer.ps1 -Setup $setup.FullName -Out installer-test -Probes probes/${{ matrix.arch }}
       - if: always()
         uses: actions/upload-artifact@v4
         with:
