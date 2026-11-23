@@ -238,6 +238,7 @@ jobs:
             zig cc -target $a-windows-gnu -O2 ci/winprobe/conpty-probe.c -o probes/$a/conpty-probe.exe
             zig cc -target $a-windows-gnu -O2 ci/winprobe/emit.c -o probes/$a/emit.exe
             zig cc -target $a-windows-gnu -O2 ci/winprobe/e2e.c -o probes/$a/e2e.exe
+            zig cc -target $a-windows-gnu -O2 ci/winprobe/catbench.c -o probes/$a/catbench.exe
           done
           rm -f probes/*/*.pdb
           ls -l probes/*
@@ -664,3 +665,40 @@ jobs:
         with:
           name: installer-test-${{ matrix.arch }}
           path: installer-test/
+
+  # Throughput, a trend line: catbench.exe writes 50 MB of coloured lines in Ghostty, in
+  # Windows' own console and in Windows Terminal where the runner has it
+  # (ci/bench-throughput.ps1). No GPU here and a shared CPU: not a claim, and never a gate.
+  bench:
+    needs: [build, winprobes]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            arch: x86_64
+          - runner: windows-11-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ghostty-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: winprobes
+          path: probes
+      - name: Throughput (${{ matrix.arch }})
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist -Filter "*-windows-${{ matrix.arch }}.zip" | Select-Object -First 1
+          ./ci/bench-throughput.ps1 -Zip $zip.FullName -Probes probes/${{ matrix.arch }} -Out bench
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-${{ matrix.arch }}
+          path: bench/bench.json
