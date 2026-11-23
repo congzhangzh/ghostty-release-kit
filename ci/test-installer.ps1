@@ -14,6 +14,9 @@ $ErrorActionPreference = 'Continue'
 New-Item -ItemType Directory -Force $Out | Out-Null
 $Out = (Resolve-Path $Out).Path
 $Setup = (Resolve-Path $Setup).Path
+# Absolute: e2e.exe types emit.exe's path into Ghostty's shell, which runs in another folder
+# (run 45193109073: a relative probes\x86_64\emit.exe was never found, so no notification came).
+if ($Probes) { $Probes = (Resolve-Path $Probes).Path }
 $fails = 0
 $lines = [System.Collections.Generic.List[string]]::new()
 function Say([string] $kind, [string] $what) { $l = '{0,-5} {1}' -f $kind, $what; Write-Host $l; $lines.Add($l) }

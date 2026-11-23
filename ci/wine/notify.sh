@@ -47,6 +47,8 @@ run() { focus; xdotool type --delay 40 "$1"; xdotool key Return; sleep "${2:-2}"
 
 # 1. selected tab, foreground window
 run 'C:\emit.exe "\e]9;one\e\\"' 3
+# The reason's wording: "its tab is the selected tab" before split-aware notifications (lane B's
+# 8a0cad108, allfeat 1bfc48713), "its pane is the focused pane" since (macOS: the focused surface).
 check "1. from the selected tab of the foreground window: not shown" 'notify: "[^"]*" / "one" not shown: its (tab is the selected tab|pane is the focused pane)'
 # 3. progress in tab 1
 run 'C:\emit.exe "\e]9;4;1;50\e\\"' 3
