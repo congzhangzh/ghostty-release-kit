@@ -42,6 +42,27 @@
 #   (GHOSTTY_SLOGAN=false hides it), tabs at most 240 points wide, minimize, restore and close
 #   working when the window is maximized, and GHOSTTY_PRESENT=swap that keeps drawing after a
 #   resize and falls back to the readback when the window cannot be swapped.
+#   r20261123.1: This release adds splits, desktop notifications and taskbar progress, and Ghostty now starts on
+#   Windows without a GPU driver (virtual machines).
+#   - Splits: a tab holds several panes. Ctrl+Shift+O splits to the right and Ctrl+Shift+E downward;
+#   Ctrl+Alt+arrows move between panes, Ctrl+Alt+] and Ctrl+Alt+[ go to the next and previous one,
+#   Alt+Shift+arrows resize, Ctrl+Shift+Enter zooms a pane to the whole tab and back, and exit
+#   closes a pane.
+#   - Notifications: a program's desktop notification (OSC 9, or OSC 777 notify) becomes a Windows
+#   notification when its tab is not the one in front, and a click on it brings that tab forward.
+#   desktop-notifications = false turns them off.
+#   - Taskbar progress: progress a program reports (OSC 9;4, as winget does) fills Ghostty's taskbar
+#   button, red on an error.
+#   - Software OpenGL: on a Windows whose OpenGL is older than 4.3, such as a virtual machine
+#   without a GPU driver, Ghostty draws with Mesa's software OpenGL from the opengl folder beside
+#   ghostty.exe instead of failing to start, and says why when it still cannot start.
+#   GHOSTTY_GL=mesa or GHOSTTY_GL=system chooses one.
+#   - Test control: GHOSTTY_TEST_CONTROL=1 opens a control pipe for automated tests (ghostty.exe
+#   /ctl); it is off otherwise.
+#   - Known: the dividers between splits can't be dragged yet (Alt+Shift+arrows resize). Taskbar
+#   progress is not yet confirmed on a Windows desktop (an earlier test build failed there; this
+#   build has the fix). Arm64 is built but its Windows test is not green yet. Ghostty still copies each frame to the window by default
+#   (GHOSTTY_PRESENT=swap draws straight into it, opt-in).
 # conpty: Microsoft's console host for pseudoconsoles (conpty.dll + OpenConsole.exe, MIT), the
 #   NuGet package Microsoft.Windows.Console.ConPTY; the commit column is the package's SHA-256.
 #   ci/build.sh puts both files, unmodified, beside ghostty.exe when the source side-loads them
@@ -58,7 +79,7 @@
 #   branch, so a test build of another commit finds its own base on it.
 #
 # name          version                url                                                                commit
-ghostty         1.4.1-dev+r20261122.10 git+https://github.com/congzhangzh/ghostty.git#release-20261122.10 65f57cbdeb9202d270c775f8df05cccd466ebf66
+ghostty         1.4.1-dev+r20261123.1  git+https://github.com/congzhangzh/ghostty.git#release-20261123.1  2e17f506a4e7ffedc7454b65450ad2b9b1842a76
 ghostty-base    main                   git+https://github.com/ghostty-org/ghostty.git#main                11ed660d99fd0dd8dadcaf456db31b71f0f21beb
 conpty          1.25.261109001         https://www.nuget.org/api/v2/package/Microsoft.Windows.Console.ConPTY/1.25.261109001  sha256:3d77f535df848e44225c2a8912ac844fecb23f3057732b639f3034b587496f09
 py-screen       0.1.0                  git+https://github.com/congzhangzh/py-screen.git                    f42a2cdedf6cf25c6941588e331e5e58755912ec
