@@ -43,7 +43,18 @@ fi
 # of sources.lock's header (empty for a build of no release). The family line: from the
 # about.py of the py-screen commit sources.lock pins, read as Python syntax, never run.
 whatsnew=$work/whatsnew.txt
-python3 -I "$kit/ci/about.py" whatsnew "$kit/sources.lock" "$version" > "$whatsnew"
+# A test build may be given its own notes (WHATSNEW_TEXT, from the workflow's "whatsnew" input),
+# so a build for someone to try shows its What's new; a release's notes are only its paragraph.
+if [ -n "${WHATSNEW_TEXT:-}" ]; then
+	case $version in *+r[0-9]*)
+		echo "::error::WHATSNEW_TEXT is for test builds; a release's notes are its sources.lock paragraph" >&2
+		exit 1
+		;;
+	esac
+	printf '%s\n' "$WHATSNEW_TEXT" > "$whatsnew"
+else
+	python3 -I "$kit/ci/about.py" whatsnew "$kit/sources.lock" "$version" > "$whatsnew"
+fi
 family='' family_from=''
 if [ -n "$(pin py-screen 4)" ]; then
 	repo=$(pin py-screen 3)
@@ -78,7 +89,8 @@ one() {
 		if [ -n "${REF:-}" ]; then echo "ghostty: ${SRC:-?} $REF @ ${SHA:-?}"; fi
 		if [ -n "${BASE:-}" ]; then echo "upstream base: ghostty-org/ghostty $(git -C "$src" rev-parse "$BASE" 2> /dev/null || echo "$BASE")"; fi
 		if [ -n "${GITHUB_SHA:-}" ]; then echo "kit: ${GITHUB_REPOSITORY:-ghostty-release-kit} @ $GITHUB_SHA"; fi
-		if [ -s "$whatsnew" ]; then echo "whatsnew: r${version##*+r}"; fi
+		if [ -n "${WHATSNEW_TEXT:-}" ]; then echo "whatsnew: given to this test build"
+		elif [ -s "$whatsnew" ]; then echo "whatsnew: r${version##*+r}"; fi
 		if [ -n "$family_from" ]; then echo "family: $family_from"; fi
 	} > "$info"
 	WHATSNEW_FILE=$whatsnew FAMILY_LINE=$family BUILDINFO_FILE=$info "$src/windows/build.sh" "$work/lib-$arch" "$arch" "$work/host-$arch" release
