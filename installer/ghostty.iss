@@ -65,11 +65,8 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 SetupLogging=yes
-; A running Ghostty is closed for an upgrade (the Restart Manager), not left holding files:
-; force, as the macOS app's updater quits it to update. (Run 45189238400: with "yes", a silent
-; upgrade over a running Ghostty stopped with exit code 5; Ghostty does not answer the Restart
-; Manager's polite request on its own.)
-CloseApplications=force
+; A running Ghostty is closed for an upgrade (the Restart Manager), not left holding files.
+CloseApplications=yes
 RestartApplications=no
 #if Arch == "aarch64"
 ArchitecturesAllowed=arm64
