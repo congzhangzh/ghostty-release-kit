@@ -28,7 +28,7 @@ ctl '{"cmd":"text","text":"echo 中文 日本語 ☕ 😀\r"}' > /dev/null; slee
 ctl '{"cmd":"read"}' > "$out/read.json"
 ctl '{"cmd":"screenshot","target":"pane","format":"png"}' > "$out/shot.json"
 kill $pid 2> /dev/null; [ "$RUN" = wine ] && wineserver -k 2> /dev/null
-$PY -I - "$out" << 'PYEOF'
+$PY -I -X utf8 - "$out" << 'PYEOF'
 import base64, json, re, struct, sys, zlib
 out = sys.argv[1]
 log = open(out + "/ghostty.log", encoding="utf-8", errors="replace").read()

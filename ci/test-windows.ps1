@@ -520,4 +520,8 @@ $logLines | Where-Object { $_ -match 'warn|err|fail|OpenGL|opengl|conpty|glcheck
 $secs = [int]((Get-Date) - $script:t0).TotalSeconds
 Add-Content -Path $results -Value "`n**$(if ($script:fails) { "FAIL ($($script:fails))" } else { 'PASS' })** in $secs s" -Encoding utf8
 if ($env:GITHUB_STEP_SUMMARY) { Get-Content $results -Raw | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8 }
+# An explicit result: without it the step would end with the exit code of the last native
+# program the script ran (run 45188658814: the fonts step's bash, whose python failed, made a
+# PASS exit 1).
 if ($script:fails) { exit 1 }
+exit 0
