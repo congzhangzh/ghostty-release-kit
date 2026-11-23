@@ -112,6 +112,20 @@
 #   test on GitHub's Windows on Arm virtual machines; not yet tested on Arm hardware. Ghostty still
 #   copies each frame to the window by default (GHOSTTY_PRESENT=swap draws straight into it,
 #   opt-in).
+#   r20261123.6: This release adds the command palette, links that open in your browser, real Windows toasts, and
+#   a per-user installer.
+#   - Command palette (Ctrl+Shift+P): every command with its key, and your terminals to jump to.
+#   - Links open in your browser (Ctrl+click); only web and mail links, never files or programs.
+#   - Installer: ghostty-…-setup.exe installs for you alone, no admin: Start menu, "Open Ghostty
+#   here" on folders, Apps & features, a clean uninstall. A silent upgrade refuses (exit 7) while
+#   Ghostty runs, unless given /FORCECLOSEAPPLICATIONS.
+#   - With the installer, notifications are real Windows toasts.
+#   - Known: Chinese and Japanese characters your font lacks may be drawn from a Korean system font
+#   (Gulim, Malgun Gothic). The setups are not signed yet, so Windows may warn before running them.
+#   Taskbar progress is not yet confirmed on a Windows desktop. Arm64 passes the end-to-end and
+#   installer tests on GitHub's Windows on Arm virtual machines; not yet tested on Arm hardware.
+#   Ghostty still copies each frame to the window by default (GHOSTTY_PRESENT=swap draws straight
+#   into it, opt-in).
 # conpty: Microsoft's console host for pseudoconsoles (conpty.dll + OpenConsole.exe, MIT), the
 #   NuGet package Microsoft.Windows.Console.ConPTY; the commit column is the package's SHA-256.
 #   ci/build.sh puts both files, unmodified, beside ghostty.exe when the source side-loads them
@@ -128,7 +142,7 @@
 #   branch, so a test build of another commit finds its own base on it.
 #
 # name          version                url                                                                commit
-ghostty         1.4.1-dev+r20261123.5  git+https://github.com/congzhangzh/ghostty.git#release-20261123.5  05e4260f588c072692652ca7c8e69f2085769bc4
+ghostty         1.4.1-dev+r20261123.6  git+https://github.com/congzhangzh/ghostty.git#release-20261123.6  172183efaaaacfc38841f2c7abbb5120853ba86c
 ghostty-base    main                   git+https://github.com/ghostty-org/ghostty.git#main                11ed660d99fd0dd8dadcaf456db31b71f0f21beb
 conpty          1.25.261109001         https://www.nuget.org/api/v2/package/Microsoft.Windows.Console.ConPTY/1.25.261109001  sha256:3d77f535df848e44225c2a8912ac844fecb23f3057732b639f3034b587496f09
 py-screen       0.1.0                  git+https://github.com/congzhangzh/py-screen.git                    f42a2cdedf6cf25c6941588e331e5e58755912ec
