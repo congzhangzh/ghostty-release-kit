@@ -104,13 +104,13 @@ Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAc
 
 # 3. an upgrade over a running Ghostty (the PO's rule: closing it ends its shells, so a silent
 # setup never does that unless told to)
-# 3a. silent, not told: it refuses (exit 5, the log line), closes nothing, changes nothing
+# 3a. silent, not told: it refuses (exit 7, the log line), closes nothing, changes nothing
 $g = Start-Process -FilePath "$app\ghostty.exe" -PassThru
 Start-Sleep -Seconds 4
 $before = (Get-FileHash "$app\ghostty.exe").Hash + (Get-Item "$app\ghostty.exe").LastWriteTimeUtc.Ticks
 $r = Install "$Out\upgrade-refused.log"
 $logText = Get-Content "$Out\upgrade-refused.log" -Raw -ErrorAction SilentlyContinue
-Check ($r[0] -eq 5) "silent upgrade over a running Ghostty refuses: exit $($r[0]) (5: setup cannot proceed)"
+Check ($r[0] -eq 7) "silent upgrade over a running Ghostty refuses: exit $($r[0]) (7: Preparing to Install cannot proceed)"
 Check ($logText -match 'Ghostty is running; close it or pass /FORCECLOSEAPPLICATIONS') "  its log says: Ghostty is running; close it or pass /FORCECLOSEAPPLICATIONS"
 Check (-not $g.HasExited) "  the running Ghostty was left running"
 $after = (Get-FileHash "$app\ghostty.exe").Hash + (Get-Item "$app\ghostty.exe").LastWriteTimeUtc.Ticks

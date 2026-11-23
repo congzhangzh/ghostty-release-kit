@@ -70,7 +70,7 @@ SetupLogging=yes
 ;   - interactive: Inno's "Preparing to Install" page names it, says its shells will end, and the
 ;     user chooses to close it or not;
 ;   - silent (/SILENT, /VERYSILENT: CI, scripts, a package manager): nothing is closed; setup
-;     stops with exit code 5 and the log line "Ghostty is running; close it or pass
+;     stops with exit code 7 (Inno: Preparing to Install cannot proceed) and the log line "Ghostty is running; close it or pass
 ;     /FORCECLOSEAPPLICATIONS". With /FORCECLOSEAPPLICATIONS it is closed (forced).
 CloseApplications=yes
 RestartApplications=no
@@ -138,7 +138,7 @@ begin
   Result := Pos('/FORCECLOSEAPPLICATIONS', Uppercase(GetCmdTail)) > 0;
 end;
 
-// A silent upgrade never closes a running Ghostty unless asked to: it stops instead (exit 5).
+// A silent upgrade never closes a running Ghostty unless asked to: it stops instead (exit 7).
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
