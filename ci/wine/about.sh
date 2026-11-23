@@ -30,7 +30,13 @@ check() { if [ "$2" = "$3" ]; then say "ok   $1"; else say "FAIL $1 (got '$2', w
 has() { [ -n "$(box "$1")" ] && echo yes || echo no; }
 
 launch first; import -window root "$out/1-first.png"
-check "1. a fresh profile: What's new opens by itself" "$(has "What's new in Ghostty")" yes
+# Only a build with notes (BUILDINFO.txt says "whatsnew:") opens What's new by itself: a test build
+# dispatched without the "whatsnew" input has none, so step 1 is skipped for it, not failed.
+if grep -q '^whatsnew:' "$(dirname "$exe")/BUILDINFO.txt" 2> /dev/null; then
+	check "1. a fresh profile: What's new opens by itself" "$(has "What's new in Ghostty")" yes
+else
+	say "skip 1. a fresh profile: What's new opens by itself (this build has no notes)"
+fi
 w=$(box "What's new in Ghostty"); [ -n "$w" ] && { xdotool windowfocus "$w" 2> /dev/null; xdotool key Return; sleep 1; }
 stop
 launch second; check "2. the next start: What's new stays closed" "$(has "What's new in Ghostty")" no; stop
