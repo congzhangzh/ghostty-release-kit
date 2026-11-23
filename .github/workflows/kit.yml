@@ -531,7 +531,7 @@ jobs:
     needs: [publish, pypi, pypi-test]
     # Off until the owner turns it on (a new public channel): the repository variable PYPI = on,
     # after PyPI's pending publisher and the "pypi" environment exist.
-    if: vars.PYPI == 'on' && needs.publish.result == 'success' && needs.pypi-test.result == 'success' && needs.publish.outputs.tag != ''
+    if: always() && vars.PYPI == 'on' && needs.publish.result == 'success' && needs.pypi-test.result == 'success' && needs.publish.outputs.tag != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: pypi
