@@ -146,7 +146,9 @@ jobs:
       - name: Wine (WineHQ stable) and the test tools
         run: ci/wine/install-wine.sh winehq
       - name: The test helpers (ci/wine/helpers/*.c, for x86_64 Windows)
-        run: ci/wine/build-helpers.sh ci/wine/bin
+        run: |
+          # Until the full set lands in ci/wine/, only ci/test-wine.sh runs (said in the summary).
+          if [ -x ci/wine/build-helpers.sh ]; then ci/wine/build-helpers.sh ci/wine/bin; fi
       - name: Test x86_64 under Wine
         env:
           VERSION: ${{ needs.build.outputs.VERSION }}
@@ -154,8 +156,15 @@ jobs:
           unzip -q "dist/ghostty-$VERSION-windows-x86_64.zip" -d pkg
           tag=$(case $VERSION in *+r[0-9]*) echo "${VERSION##*+r}" ;; *) sha=${{ needs.build.outputs.SHA }}; echo "${sha:0:9}" ;; esac)
           set +e
-          ci/wine/run-all.sh "pkg/ghostty-$VERSION-windows-x86_64" wine-x64 "$tag"
-          rc=$?
+          if [ -x ci/wine/run-all.sh ]; then
+            ci/wine/run-all.sh "pkg/ghostty-$VERSION-windows-x86_64" wine-x64 "$tag"
+            rc=$?
+          else
+            echo "::warning::ci/wine/run-all.sh is not here yet: ci/test-wine.sh only"
+            GHOSTTY_WHATSNEW=off xvfb-run -a -s "-screen 0 1280x800x24" ci/test-wine.sh "pkg/ghostty-$VERSION-windows-x86_64/ghostty.exe" wine-x64/test-wine
+            rc=$?
+            { echo "### x86_64 under Wine: ci/test-wine.sh only (the full set is not in ci/wine/ yet)"; echo; echo '```'; cat wine-x64/test-wine/test.log; echo '```'; } > wine-x64/summary.md
+          fi
           cat wine-x64/summary.md >> "$GITHUB_STEP_SUMMARY"
           exit $rc
       - name: Keep the results
