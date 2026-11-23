@@ -1,13 +1,17 @@
 name: Build, test and publish Ghostty for Windows
 
 # Cross-compiles the Ghostty commit that sources.lock pins (or, on demand, another fork branch)
-# for Windows x64 and Arm64 with Zig on Linux, tests the x64 build under Wine on a virtual X
-# server, and on a push to main that passes publishes the rolling release <YYYYMMDD>.<N>, as
-# rdp-release-kit does: the zips and SHA256SUMS, as GitHub's latest release, published once
-# and never replaced. A build whose inputs (the pin, ci/build.sh) are already released
-# publishes nothing. A pull request, and a run with "ref", only build and test. What a push
-# needs comes from ci/changes.sh: no build when nothing a build reads changed, build and test
-# only when the other scripts changed, and the release only when the pin or ci/build.sh did.
+# for Windows x64 and Arm64 with Zig on Linux, once (build); then tests those very zips in
+# parallel: x86_64 under Wine, the full set in ci/wine/ (wine-x64); aarch64 under Wine on an
+# arm64 Linux runner (wine-arm64); both on real Windows, windows-latest and windows-11-arm
+# (windows). The gate job gives the run one verdict: the build and every job in MUST_TEST
+# passed; it also lists each job's minutes. On a push to main that passes the gate, publish
+# makes the rolling release <YYYYMMDD>.<N>, as rdp-release-kit does: the zips and SHA256SUMS,
+# as GitHub's latest release, published once and never replaced. A build whose inputs (the pin,
+# ci/build.sh, ci/about.py) are already released publishes nothing. A pull request, and a run
+# with "ref", only build and test. What a push needs comes from ci/changes.sh: no build when
+# nothing a build reads changed, build and test only when the other scripts changed, and the
+# release only when the pin or the package's inputs did. Only GitHub's free standard runners.
 on:
   push:
     branches: [main]
@@ -18,15 +22,22 @@ on:
       ref:
         description: Test this fork branch or commit instead of the pin (e.g. integration-windows, before picking it); never published
         default: ''
+      whatsnew:
+        description: What's new text for this test build (shown once by ghostty.exe after an upgrade); a release's notes are its sources.lock paragraph
+        default: ''
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: kit-${{ github.ref }}
 
 env:
   ZIG_VERSION: 0.17.1
+  # The test jobs the gate requires (and so a release): their job ids. The others run and are
+  # reported. wine-arm64 and windows join once they have proven themselves on candidates.
+  MUST_TEST: wine-x64
 
 jobs:
   changes:
@@ -51,20 +62,30 @@ jobs:
           echo "::notice::scope: $scope"
           echo "scope=$scope" >> "$GITHUB_OUTPUT"
 
+  # One build of both architectures; its zips are the artifact every test job takes, so what is
+  # tested is what is published.
   build:
     needs: changes
     if: needs.changes.outputs.scope != 'none'
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    outputs:
+      VERSION: ${{ steps.resolve.outputs.VERSION }}
+      SHA: ${{ steps.resolve.outputs.SHA }}
+      BASE: ${{ steps.resolve.outputs.BASE }}
+      SRC: ${{ steps.resolve.outputs.SRC }}
+      REF: ${{ steps.resolve.outputs.REF }}
+      PINNED: ${{ steps.resolve.outputs.PINNED }}
     steps:
       - uses: actions/checkout@v4
         with:
           path: kit
 
       - name: Resolve the Ghostty commit
+        id: resolve
         env:
           REF: ${{ inputs.ref }}
-        run: kit/ci/resolve.sh kit ghostty "$REF" "$GITHUB_RUN_NUMBER" | tee -a "$GITHUB_ENV"
+        run: kit/ci/resolve.sh kit ghostty "$REF" "$GITHUB_RUN_NUMBER" | tee -a "$GITHUB_ENV" "$GITHUB_OUTPUT"
 
       - name: Check out the Ghostty commit
         run: git -C ghostty checkout -q "$SHA" && git -C ghostty log -1 --format='%h %s'
@@ -79,91 +100,111 @@ jobs:
           # uses Windows on Arm (2026-11-23: "be sure arm64 works now"); "x86_64" alone brings
           # back x64 first, where a failed aarch64 is left out of the release and named in its notes.
           MUST_BUILD: x86_64 aarch64
+          WHATSNEW_TEXT: ${{ inputs.whatsnew }}
         run: |
           sudo apt-get install -y -q zip > /dev/null
           kit/ci/build.sh ghostty "$VERSION" out x86_64 aarch64
 
-      - name: Test x86_64 under Wine
+      - name: The commits, for the release notes
         run: |
-          # WineHQ's stable Wine (11.x), the version the tests pass with: under the runner's
-          # own Wine (Ubuntu 26.04's 10.0) ghostty.exe exited before its window appeared,
-          # and Ubuntu 24.04's 9.0 showed the window black and unfocused, while the same zip
-          # passes under Wine 11.
-          # The key is ASCII-armored; apt 3 reads armor only from a .asc file, and the
-          # .sources file names winehq-archive.key, so it is stored dearmored.
-          sudo dpkg --add-architecture i386
-          sudo mkdir -pm755 /etc/apt/keyrings
-          wget -q -O- https://dl.winehq.org/wine-builds/winehq.key | sudo gpg --dearmor -o /etc/apt/keyrings/winehq-archive.key
-          codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
-          sudo wget -q -NP /etc/apt/sources.list.d/ "https://dl.winehq.org/wine-builds/ubuntu/dists/$codename/winehq-$codename.sources"
-          sudo apt-get update -q
-          sudo apt-get install -y -q --install-recommends winehq-stable > /dev/null
-          sudo apt-get install -y -q --no-install-recommends xvfb xauth xdotool imagemagick mesa-utils libgl1-mesa-dri > /dev/null
-          wine --version
-          exe=out/work/pkg-x86_64/ghostty-$VERSION-windows-x86_64/ghostty.exe
-          xvfb-run -a -s "-screen 0 1280x800x24" kit/ci/test-wine.sh "$exe" out/test
+          {
+            if [ "$BASE" != - ]; then
+              echo "**Base:** upstream ghostty-org/ghostty $(git -C ghostty log -1 --format='`%h` %s' "$BASE")"
+              echo
+              echo "**Our commits on top:**"
+              git -C ghostty log --reverse --format='- `%h` %s' "$BASE..$SHA"
+            fi
+          } > out/commits.md
 
       - name: Keep the build
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ghostty-${{ env.VERSION }}
           path: |
             out/*.zip
             out/SHA256SUMS
-            out/test/test.log
-            out/test/*.png
-            out/test/ghostty.log
+            out/NOT-BUILT
+            out/commits.md
           if-no-files-found: ignore
 
-      - name: Publish the rolling release
-        if: env.PINNED == 'true' && needs.changes.outputs.scope == 'release' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+  # x86_64 under Wine on a virtual X server (Mesa llvmpipe): ci/test-wine.sh first (window,
+  # typing through ConPTY, drawing, exit), then the rest of ci/wine/ (tabs, themes, the stats
+  # pipe, the shell, the title bar and its menu, ConPTY's choices, notifications, About).
+  wine-x64:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ghostty-${{ needs.build.outputs.VERSION }}
+          path: dist
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: ${{ env.ZIG_VERSION }}
+      - name: Wine (WineHQ stable) and the test tools
+        run: ci/wine/install-wine.sh winehq
+      - name: The test helpers (ci/wine/helpers/*.c, for x86_64 Windows)
+        run: ci/wine/build-helpers.sh ci/wine/bin
+      - name: Test x86_64 under Wine
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.build.outputs.VERSION }}
         run: |
-          # The tag is the pin's own release, <YYYYMMDD>.<N> from a version 1.4.1-dev+r<YYYYMMDD>.<N>,
-          # so it always matches the fork's release-<YYYYMMDD>.<N>, the zip names, BUILDINFO.txt and the
-          # window title, also when a picked release was never published (20261122.6). Counting
-          # the day's tags is kept only for a version without +r (none is pinned so far).
-          case $VERSION in
-          *+r[0-9]*) tag=${VERSION##*+r} ;;
-          *)
-            day=$(date -u +%Y%m%d)
-            n=$(( $(git -C kit ls-remote --tags "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "refs/tags/$day.*" | wc -l) + 1 ))
-            tag=$day.$n
-            ;;
-          esac
-          if ! [[ $tag =~ ^[0-9]{8}\.[0-9]+$ ]]; then echo "::error::no release tag from version $VERSION ($tag)"; exit 1; fi
-          key="ghostty $VERSION ${SHA:0:12}, build.sh $(git -C kit rev-parse --short=12 HEAD:ci/build.sh), README.txt $(git -C kit rev-parse --short=12 HEAD:ci/README.txt), about.py $(git -C kit rev-parse --short=12 HEAD:ci/about.py 2> /dev/null || echo none), zig $ZIG_VERSION"
-          fork=${SRC#https://github.com/}
-          fork=${fork%.git}
-          # shellcheck disable=SC2016 # the backticks are Markdown
-          {
-            echo "Ghostty \`$VERSION\` for Windows, built by ghostty-release-kit \`${GITHUB_SHA:0:12}\` from [\`$REF\`](https://github.com/$fork/tree/$REF) @ \`${SHA:0:12}\` with Zig $ZIG_VERSION, and tested under Wine. An early, unofficial build."
-            echo
-            echo "**Base:** upstream ghostty-org/ghostty $(git -C ghostty log -1 --format='`%h` %s' "$BASE")"
-            echo
-            echo "**Our commits on top:**"
-            git -C ghostty log --reverse --format='- `%h` %s' "$BASE..$SHA"
-            echo
-            echo "**Tests** (\`ci/test-wine.sh\`, x86_64 under Wine with Mesa llvmpipe):"
-            grep -E '^(ok|#)' out/test/test.log | sed 's/^/- /'
-            echo
-            if [ -f "out/ghostty-$VERSION-windows-aarch64.zip" ]; then
-              echo "**Install:** unzip \`ghostty-$VERSION-windows-x86_64.zip\` (or \`-aarch64\` for Windows on Arm) and run \`ghostty.exe\`. README.txt inside says what works and what does not yet."
-            else
-              echo "**Install:** unzip \`ghostty-$VERSION-windows-x86_64.zip\` and run \`ghostty.exe\`. README.txt inside says what works and what does not yet."
-            fi
-            echo
-            # An architecture ci/build.sh could not build (x86_64 always builds, or nothing is published).
-            if [ -f out/NOT-BUILT ]; then
-              while read -r a; do echo "**$a:** not built in this release (build error; fixed in the next)."; echo; done < out/NOT-BUILT
-            fi
-            echo "Published once, never replaced. <!-- kit-key: $key --> <!-- version: $VERSION -->"
-          } > out/notes.md
-          cat out/notes.md
-          KEY=$key python3 -I kit/ci/publish-release.py "$tag" "$GITHUB_SHA" \
-            "Ghostty for Windows $tag" out/notes.md out/*.zip out/SHA256SUMS
+          unzip -q "dist/ghostty-$VERSION-windows-x86_64.zip" -d pkg
+          tag=$(case $VERSION in *+r[0-9]*) echo "${VERSION##*+r}" ;; *) sha=${{ needs.build.outputs.SHA }}; echo "${sha:0:9}" ;; esac)
+          set +e
+          ci/wine/run-all.sh "pkg/ghostty-$VERSION-windows-x86_64" wine-x64 "$tag"
+          rc=$?
+          cat wine-x64/summary.md >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wine-x64
+          path: |
+            wine-x64/summary.md
+            wine-x64/**/*.log
+            wine-x64/**/*.txt
+          if-no-files-found: ignore
+
+  # aarch64 under Wine on an arm64 Linux runner (free for public repositories): the
+  # distribution's Wine runs Arm64 Windows programs natively. The first, fast test only.
+  wine-arm64:
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ghostty-${{ needs.build.outputs.VERSION }}
+          path: dist
+      - name: Wine (the distribution's) and the test tools
+        run: ci/wine/install-wine.sh distro
+      - name: Test aarch64 under Wine
+        env:
+          VERSION: ${{ needs.build.outputs.VERSION }}
+        run: |
+          zip=dist/ghostty-$VERSION-windows-aarch64.zip
+          [ -f "$zip" ] || { echo "::error::no aarch64 zip in the build"; exit 1; }
+          unzip -q "$zip" -d pkg
+          export GHOSTTY_WHATSNEW=off
+          set +e
+          xvfb-run -a -s "-screen 0 1280x800x24" ci/test-wine.sh "pkg/ghostty-$VERSION-windows-aarch64/ghostty.exe" wine-arm64
+          rc=$?
+          { echo "### aarch64 under Wine ($(wine --version))"; echo; echo '```'; cat wine-arm64/test.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wine-arm64
+          path: |
+            wine-arm64/test.log
+            wine-arm64/ghostty.log
+          if-no-files-found: ignore
 
   # The probes the Windows job runs (ci/winprobe/*.c), cross-compiled here with the same Zig, one
   # set per architecture; seconds of work, so it runs beside the build.
@@ -263,3 +304,111 @@ jobs:
             wintest/conpty-*.txt
             wintest/gl-*/glprobe.txt
           if-no-files-found: ignore
+
+  # One verdict per run: every job named in MUST_TEST passed (the other test jobs are reported,
+  # not required), and each job's minutes, so the cost of the loop is on every run's page.
+  gate:
+    needs: [changes, build, wine-x64, wine-arm64, windows]
+    if: always() && needs.build.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      NEEDS: ${{ toJSON(needs) }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Required tests (MUST_TEST) and the minutes
+        run: |
+          {
+            echo "### Gate: MUST_TEST = $MUST_TEST"
+            echo
+            echo "| job | result | required |"
+            echo "|---|---|---|"
+            for j in build wine-x64 wine-arm64 windows; do
+              r=$(jq -r --arg j "$j" '.[$j].result' <<< "$NEEDS")
+              req=no; case " build $MUST_TEST " in *" $j "*) req=yes ;; esac
+              echo "| $j | $r | $req |"
+            done
+            echo
+            echo "| job (runner) | minutes |"
+            echo "|---|---|"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=50" \
+              -q '.jobs[] | select(.completed_at != null) | "| \(.name) (\(.labels | join(","))) | \(((.completed_at | fromdateiso8601) - (.started_at | fromdateiso8601)) / 60 * 10 | floor / 10) |"'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat "$GITHUB_STEP_SUMMARY"
+          bad=
+          for j in build $MUST_TEST; do
+            r=$(jq -r --arg j "$j" '.[$j].result' <<< "$NEEDS")
+            [ "$r" = success ] || bad="$bad $j=$r"
+          done
+          if [ -n "$bad" ]; then echo "::error::required jobs did not pass:$bad"; exit 1; fi
+          echo "::notice::gate green: build and $MUST_TEST passed"
+
+  # On a push to main whose pin or package inputs changed, and only when the gate is green: the
+  # rolling release <YYYYMMDD>.<N>, published once and never replaced.
+  publish:
+    needs: [changes, build, gate]
+    if: needs.gate.result == 'success' && needs.build.outputs.PINNED == 'true' && needs.changes.outputs.scope == 'release' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERSION: ${{ needs.build.outputs.VERSION }}
+      SHA: ${{ needs.build.outputs.SHA }}
+      SRC: ${{ needs.build.outputs.SRC }}
+      REF: ${{ needs.build.outputs.REF }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: kit
+      - uses: actions/download-artifact@v4
+        with:
+          name: ghostty-${{ needs.build.outputs.VERSION }}
+          path: out
+      - uses: actions/download-artifact@v4
+        with:
+          name: wine-x64
+          path: out/wine-x64
+      - name: Publish the rolling release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The tag is the pin's own release, <YYYYMMDD>.<N> from a version 1.4.1-dev+r<YYYYMMDD>.<N>,
+          # so it always matches the fork's release-<YYYYMMDD>.<N>, the zip names, BUILDINFO.txt and the
+          # window title, also when a picked release was never published (20261122.6). Counting
+          # the day's tags is kept only for a version without +r (none is pinned so far).
+          case $VERSION in
+          *+r[0-9]*) tag=${VERSION##*+r} ;;
+          *)
+            day=$(date -u +%Y%m%d)
+            n=$(( $(git -C kit ls-remote --tags "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "refs/tags/$day.*" | wc -l) + 1 ))
+            tag=$day.$n
+            ;;
+          esac
+          if ! [[ $tag =~ ^[0-9]{8}\.[0-9]+$ ]]; then echo "::error::no release tag from version $VERSION ($tag)"; exit 1; fi
+          key="ghostty $VERSION ${SHA:0:12}, build.sh $(git -C kit rev-parse --short=12 HEAD:ci/build.sh), README.txt $(git -C kit rev-parse --short=12 HEAD:ci/README.txt), about.py $(git -C kit rev-parse --short=12 HEAD:ci/about.py 2> /dev/null || echo none), zig $ZIG_VERSION"
+          fork=${SRC#https://github.com/}
+          fork=${fork%.git}
+          testlog=$(find out/wine-x64 -path '*test-wine*/test.log' | head -1)
+          # shellcheck disable=SC2016 # the backticks are Markdown
+          {
+            echo "Ghostty \`$VERSION\` for Windows, built by ghostty-release-kit \`${GITHUB_SHA:0:12}\` from [\`$REF\`](https://github.com/$fork/tree/$REF) @ \`${SHA:0:12}\` with Zig $ZIG_VERSION, and tested under Wine. An early, unofficial build."
+            echo
+            cat out/commits.md
+            echo
+            echo "**Tests** (\`ci/test-wine.sh\`, x86_64 under Wine with Mesa llvmpipe; the full set: \`ci/wine/\`, all required by the gate):"
+            [ -n "$testlog" ] && grep -E '^(ok|#)' "$testlog" | sed 's/^/- /'
+            echo
+            if [ -f "out/ghostty-$VERSION-windows-aarch64.zip" ]; then
+              echo "**Install:** unzip \`ghostty-$VERSION-windows-x86_64.zip\` (or \`-aarch64\` for Windows on Arm) and run \`ghostty.exe\`. README.txt inside says what works and what does not yet."
+            else
+              echo "**Install:** unzip \`ghostty-$VERSION-windows-x86_64.zip\` and run \`ghostty.exe\`. README.txt inside says what works and what does not yet."
+            fi
+            echo
+            # An architecture ci/build.sh could not build and MUST_BUILD did not require.
+            if [ -f out/NOT-BUILT ]; then
+              while read -r a; do echo "**$a:** not built in this release (build error; fixed in the next)."; echo; done < out/NOT-BUILT
+            fi
+            echo "Published once, never replaced. <!-- kit-key: $key --> <!-- version: $VERSION -->"
+          } > out/notes.md
+          cat out/notes.md
+          KEY=$key python3 -I kit/ci/publish-release.py "$tag" "$GITHUB_SHA" \
+            "Ghostty for Windows $tag" out/notes.md out/*.zip out/SHA256SUMS
