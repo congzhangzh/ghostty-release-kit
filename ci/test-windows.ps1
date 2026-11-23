@@ -413,6 +413,24 @@ if ($hwnd -ne [IntPtr]::Zero) {
 if (-not $g.HasExited) { Stop-Process -Id $g.Id -Force -ErrorAction SilentlyContinue }
 Get-Process OpenConsole -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
+# --- 8. End to end through the test-control pipe (a build that has it: GHOSTTY_TEST_CONTROL)
+Section '8. End to end (e2e.exe through the test-control pipe)'
+$bytes = [System.IO.File]::ReadAllBytes($exe.FullName)
+$hasPipe = ([System.Text.Encoding]::Unicode.GetString($bytes)).Contains('GHOSTTY_TEST_CONTROL') -or
+	([System.Text.Encoding]::ASCII.GetString($bytes)).Contains('GHOSTTY_TEST_CONTROL')
+if (-not $hasPipe -or -not (Test-Path "$Probes\e2e.exe")) {
+	Say 'info' "not tried: $(if (-not $hasPipe) { 'this ghostty.exe has no test-control pipe' } else { 'no e2e.exe' })"
+} else {
+	Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+	$e2eOut = Join-Path $Out 'e2e'
+	$p = Start-Process -FilePath "$Probes\e2e.exe" -ArgumentList @($exe.FullName, $e2eOut, "$pkg\emit.exe") -NoNewWindow -PassThru -RedirectStandardOutput "$Out\e2e.stdout"
+	if (-not $p.WaitForExit(240000)) { $p.Kill(); Say 'FAIL' 'e2e: no exit in 240 s' }
+	foreach ($l in @(Get-Content "$Out\e2e.stdout" -ErrorAction SilentlyContinue)) {
+		if ($l -match '^(ok|FAIL|#)\s+(.*)$') { Say $(if ($Matches[1] -eq '#') { 'info' } else { $Matches[1] }) "e2e: $($Matches[2])" }
+	}
+	Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+}
+
 # --- 7. Microsoft's Compatibility Pack (GL on D3D12), last: it changes the machine
 if ($CompatPack) {
 	Section "7. Microsoft's OpenCL, OpenGL and Vulkan Compatibility Pack (Store 9NQPSL29BFFF, by winget)"

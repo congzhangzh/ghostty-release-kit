@@ -229,6 +229,7 @@ jobs:
             zig cc -target $a-windows-gnu -O2 ci/winprobe/glprobe.c -lopengl32 -lgdi32 -luser32 -o probes/$a/glprobe.exe
             zig cc -target $a-windows-gnu -O2 ci/winprobe/conpty-probe.c -o probes/$a/conpty-probe.exe
             zig cc -target $a-windows-gnu -O2 ci/winprobe/emit.c -o probes/$a/emit.exe
+            zig cc -target $a-windows-gnu -O2 ci/winprobe/e2e.c -o probes/$a/e2e.exe
           done
           rm -f probes/*/*.pdb
           ls -l probes/*
@@ -307,6 +308,7 @@ jobs:
             wintest/ghostty.log
             wintest/conpty-*.txt
             wintest/gl-*/glprobe.txt
+            wintest/e2e/*.log
           if-no-files-found: ignore
 
   # One verdict per run: every job named in MUST_TEST passed (the other test jobs are reported,
