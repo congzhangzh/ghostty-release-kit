@@ -26,28 +26,33 @@ off.
 ## Feature families
 
 Recorded by CI on a clean GitHub Windows runner (`ci/demo/`), and looked at frame by frame before
-they are published. These are from release 20261124.5.
+they are published. These are from release 20261124.6.
 
 **Workspace**: tabs, splits you can drag and zoom, and a cheat sheet of the keys (Ctrl+Shift+?).
 
-![workspace](../../releases/download/20261124.5/demo-workspace.gif)
+![workspace](../../releases/download/20261124.6/demo-workspace.gif)
 
 **Look**: the window menu's themes and fonts, and light and dark pairs (Ctrl+Shift+F12).
 
-![look](../../releases/download/20261124.5/demo-look.gif)
+![look](../../releases/download/20261124.6/demo-look.gif)
 
 **Focus**: full screen (F11), with the bar back when the mouse goes to the top.
 
-![focus](../../releases/download/20261124.5/demo-focus.gif)
+![focus](../../releases/download/20261124.6/demo-focus.gif)
 
 **Commands**: the command palette (Ctrl+Shift+P): type what you want, and it runs.
 
-![commands](../../releases/download/20261124.5/demo-commands.gif)
+![commands](../../releases/download/20261124.6/demo-commands.gif)
 
 **Speed**: the stats overlay (Ctrl+Shift+I) while 20000 lines scroll. A cloud runner has no GPU,
 so this shows the overlay, not the speed.
 
-![speed](../../releases/download/20261124.5/demo-speed.gif)
+![speed](../../releases/download/20261124.6/demo-speed.gif)
+
+**Agents**: what a program running in a tab tells you, as on macOS: a thin progress bar along its
+pane (red on an error), and a bell on its tab until you look at it.
+
+![agents](../../releases/download/20261124.6/demo-agents.gif)
 
 ## What the port is
 
