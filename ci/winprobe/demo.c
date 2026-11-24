@@ -25,6 +25,8 @@
  *                             (screen coordinates), e.g. the help button, "help"
  *   menuinvoke <text>         the first window-menu item whose text contains <text> (as {"cmd":
  *                             "menu"} lists it), invoked by id: fonts and shells differ by machine
+ *   hold <ms>                 take no frames for ms (the last one stays on): over a change of
+ *                             size, e.g. F11, where Windows shows the window half drawn
  *   capture window|corner|screen   what the frames show from now on: Ghostty's window (the
  *                             default); "corner", from the window's top-left to the screen's
  *                             bottom-right (the taskbar's tray and a toast, the window readable);
@@ -215,6 +217,7 @@ static void vtype(const char* utf8) {
 static IWICImagingFactory* g_wic;
 static volatile LONG g_recording;
 static volatile LONG g_whole_screen; /* 0 window, 1 screen, 2 corner */
+static volatile LONG g_hold_until;   /* GetTickCount() before which no frame is taken ("hold") */
 static char g_scene_dir[MAX_PATH];
 
 static int save_png(const char* path, const BYTE* bgra, int w, int h) {
@@ -270,6 +273,8 @@ static DWORD WINAPI recorder(LPVOID arg) {
 	int n = 0, fixed_w = 0, fixed_h = 0;
 	char prev[MAX_PATH] = "";
 	while (g_recording) {
+		/* "hold": the frame before stays on screen (its duration grows to the next one) */
+		if ((LONG)(GetTickCount() - (DWORD)g_hold_until) < 0) { Sleep(20); continue; }
 		RECT r;
 		if (g_whole_screen == 1) SetRect(&r, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
 		else {
@@ -380,6 +385,8 @@ static void play(const char* file) {
 				free(ctl_line("{\"cmd\":\"key\",\"key\":\"enter\"}"));
 				part = nl + 2;
 			}
+		} else if (!strcmp(a, "hold")) {
+			InterlockedExchange(&g_hold_until, (LONG)(GetTickCount() + (DWORD)atoi(rest)));
 		} else if (!strcmp(a, "sleep")) {
 			Sleep((DWORD)atoi(rest));
 		} else if (!strcmp(a, "move")) {

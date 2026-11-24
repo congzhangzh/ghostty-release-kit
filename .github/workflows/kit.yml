@@ -758,11 +758,14 @@ jobs:
           New-Item -ItemType Directory -Force C:\demo | Out-Null
           # The words no frame may show: the machine's name and the user's.
           "$env:COMPUTERNAME $env:USERNAME" | Set-Content machine.txt -Encoding utf8
-          # A neutral shell: the prompt is "PS> ", the title "pwsh", in C:\demo. No global Quick
-          # Terminal key: on the runner something holds Win+`, and the bar would say so (lane A).
-          $init = "function prompt { 'PS> ' }; `$Host.UI.RawUI.WindowTitle = 'pwsh'; Set-Location C:\demo; Clear-Host"
+          # A neutral shell: the prompt is "PS> ", in C:\demo, every tab titled "PowerShell" (no
+          # "Administrator: C:\Program Files\..." before the shell starts). No history and no
+          # grey prediction from it: PSReadLine's history is per user, so one scene's commands
+          # showed up in the next (run 45310313404). No global Quick Terminal key: on the runner
+          # something holds Win+`, and the bar would say so (lane A).
+          $init = "function prompt { 'PS> ' }; try { Set-PSReadLineOption -HistorySaveStyle SaveNothing -PredictionSource None } catch {}; Set-Location C:\demo; Clear-Host"
           $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($init))
-          ./probes/x86_64/demo.exe $exe ci\demo\scenes frames -- "--command=pwsh -NoLogo -NoProfile -NoExit -EncodedCommand $enc" "--working-directory=C:\demo" "--window-padding-x=10" "--keybind=global:super+grave_accent=unbind"
+          ./probes/x86_64/demo.exe $exe ci\demo\scenes frames -- "--command=pwsh -NoLogo -NoProfile -NoExit -EncodedCommand $enc" "--working-directory=C:\demo" "--title=PowerShell" "--window-padding-x=10" "--keybind=global:super+grave_accent=unbind"
           Get-ChildItem frames -Directory | ForEach-Object { "{0}: {1} frames" -f $_.Name, (Get-ChildItem $_.FullName -Filter 'f*').Count }
       - uses: actions/upload-artifact@v4
         with:

@@ -1,20 +1,43 @@
-# focus: full screen, the bar revealed at the top, and back
+# focus: full screen with F11, bigger type, the bar the mouse reveals at the top, its "?", and back
 sleep 500
 text echo full screen with F11\n
-sleep 800
-key f11
-sleep 1500
-move 0.5 0.5 300
-sleep 300
-move 0.5 0.0 700
-sleep 1600
-move 0.5 0.5 500
-sleep 1200
-move 0.5 0.0 500
 sleep 900
-clickrect help
-sleep 1800
-vkey escape
-sleep 500
+# no frames while Windows resizes the window: the frame before stays, then the full screen
+hold 900
 key f11
+sleep 1000
+# Ctrl+= eight times: type you can read from across the room
+key = ctrl
+sleep 90
+key = ctrl
+sleep 90
+key = ctrl
+sleep 90
+key = ctrl
+sleep 90
+key = ctrl
+sleep 90
+key = ctrl
+sleep 90
+key = ctrl
+sleep 90
+key = ctrl
+sleep 700
+text echo nothing but the terminal\n
 sleep 1200
+# the mouse at the top edge slides the bar down
+move 0.5 0.5 300
+sleep 200
+move 0.5 0.0 700
+sleep 1500
+# the bar's "?" (left of its exit button, each 46 px at the runner's 96 dpi): the overview.
+# "list" names no "help" in full screen (the bar is a popup), so it's clicked by its place.
+click 0.964 0.012
+sleep 2200
+vkey escape
+sleep 600
+key 0 ctrl
+sleep 500
+hold 900
+key f11
+sleep 1400
