@@ -23,6 +23,37 @@ tools: frame timings, CPU and memory, tab titles. Only processes of your own use
 machine can open it, and it never carries what is on the screen. GHOSTTY_STATS_IPC=off turns it
 off.
 
+## Feature families
+
+Recorded by CI on a clean GitHub Windows runner for each release (`ci/demo/`), and read frame
+by frame for names and paths before they are published. [All of them as one video.](../../releases/latest/download/demo-all.mp4)
+
+**Workspace**: tabs, splits you can drag and zoom, and a cheat sheet of the keys (Ctrl+Shift+?).
+
+![workspace](../../releases/latest/download/demo-workspace.gif)
+
+**Look**: the window menu's themes, and light and dark pairs (Ctrl+Shift+F12).
+
+![look](../../releases/latest/download/demo-look.gif)
+
+**Focus**: full screen (F11), with the bar back when the mouse goes to the top.
+
+![focus](../../releases/latest/download/demo-focus.gif)
+
+**Commands**: the command palette (Ctrl+Shift+P), and the config reloaded in place.
+
+![commands](../../releases/latest/download/demo-commands.gif)
+
+**Speed**: the stats overlay (Ctrl+Shift+I) while a lot of output scrolls. A cloud runner has no
+GPU, so this shows the overlay, not the speed.
+
+![speed](../../releases/latest/download/demo-speed.gif)
+
+**Agents**: taskbar progress from a program, a notification from a pane you are not looking at,
+and a new tab in the same folder.
+
+![agents](../../releases/latest/download/demo-agents.gif)
+
 ## What the port is
 
 Upstream Ghostty already had the parts under the app on Windows (ConPTY, fonts, libghostty-vt)

@@ -1,0 +1,16 @@
+# look: the window menu's themes, and light/dark pairs (Ctrl+Shift+F12, a host key: real input)
+sleep 500
+text Get-ChildItem C:\Windows\Web | Format-Table -AutoSize\n
+sleep 900
+ctl {"cmd":"menu","open":true}
+sleep 1600
+vkey escape
+sleep 400
+ctl {"cmd":"menu","invoke":4240}
+sleep 1300
+ctl {"cmd":"menu","invoke":4224}
+sleep 1300
+vkey ctrl+shift+f12
+sleep 1400
+vkey ctrl+shift+f12
+sleep 1400

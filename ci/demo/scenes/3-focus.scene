@@ -1,0 +1,18 @@
+# focus: full screen, the bar revealed at the top, and back
+sleep 500
+text echo full screen with F11\n
+sleep 800
+key f11
+sleep 1500
+move 0.5 0.5 300
+sleep 300
+move 0.5 0.0 700
+sleep 1600
+move 0.5 0.5 500
+sleep 1200
+clickrect help
+sleep 1800
+vkey escape
+sleep 500
+key f11
+sleep 1200

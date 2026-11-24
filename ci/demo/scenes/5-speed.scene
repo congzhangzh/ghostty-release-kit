@@ -1,0 +1,8 @@
+# speed: the stats overlay (Ctrl+Shift+I) while a lot of output scrolls
+sleep 400
+key i ctrl,shift
+sleep 1000
+text 1..20000 | % { "line $_ the quick brown fox jumps over the lazy dog" }\n
+sleep 5000
+key i ctrl,shift
+sleep 800

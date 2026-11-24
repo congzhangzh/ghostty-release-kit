@@ -1,0 +1,19 @@
+# agents: a notification from a background pane, taskbar progress, a new tab in the same folder
+capture screen
+sleep 500
+text mkdir C:\demo\project -Force | Out-Null; cd C:\demo\project\n
+sleep 700
+ctl {"cmd":"action","action":"new_split:right"}
+sleep 900
+text 0..100 | % { [Console]::Write("`e]9;4;1;$_`e\"); Start-Sleep -Milliseconds 30 }; [Console]::Write("`e]9;4;0`e\")\n
+sleep 4200
+ctl {"cmd":"action","action":"goto_split:left"}
+sleep 400
+text Start-Sleep 2; [Console]::Write("`e]777;notify;Build;finished in the other pane`e\")\n
+sleep 300
+ctl {"cmd":"action","action":"goto_split:right"}
+sleep 3500
+key t ctrl,shift
+sleep 1000
+text Get-Location\n
+sleep 1800

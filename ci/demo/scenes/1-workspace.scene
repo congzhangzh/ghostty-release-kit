@@ -1,0 +1,26 @@
+# workspace: tabs, splits, a divider drag, zoom, the cheat sheet
+sleep 600
+text echo one window, many shells\n
+sleep 900
+key t ctrl,shift
+sleep 900
+text echo a second tab\n
+sleep 700
+ctl {"cmd":"action","action":"new_split:right"}
+sleep 900
+text echo split right\n
+sleep 600
+ctl {"cmd":"action","action":"new_split:down"}
+sleep 900
+text echo and down\n
+sleep 600
+drag 0.5 0.3 0.38 0.3 900
+sleep 700
+ctl {"cmd":"action","action":"toggle_split_zoom"}
+sleep 1300
+ctl {"cmd":"action","action":"toggle_split_zoom"}
+sleep 800
+vkey ctrl+shift+/
+sleep 2200
+vkey escape
+sleep 500

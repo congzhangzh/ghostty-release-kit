@@ -239,6 +239,7 @@ jobs:
             zig cc -target $a-windows-gnu -O2 ci/winprobe/emit.c -o probes/$a/emit.exe
             zig cc -target $a-windows-gnu -O2 ci/winprobe/e2e.c -o probes/$a/e2e.exe
             zig cc -target $a-windows-gnu -O2 ci/winprobe/catbench.c -o probes/$a/catbench.exe
+            zig cc -target $a-windows-gnu -O2 ci/winprobe/demo.c -lole32 -lwindowscodecs -lshlwapi -luser32 -lgdi32 -o probes/$a/demo.exe
           done
           rm -f probes/*/*.pdb
           ls -l probes/*
@@ -367,7 +368,7 @@ jobs:
   # On a push to main whose pin or package inputs changed, and only when the gate is green: the
   # rolling release <YYYYMMDD>.<N>, published once and never replaced.
   publish:
-    needs: [changes, build, gate, installer-test]
+    needs: [changes, build, gate, installer-test, demo-assemble]
     outputs:
       tag: ${{ steps.release.outputs.tag }}
     # always(): without a status function GitHub adds success(), which checks every job upstream
@@ -401,6 +402,13 @@ jobs:
         with:
           name: installers
           path: out/installers
+      # The feature demos (ci/demo/), only when their frames passed the privacy check: the
+      # artifact exists only then; the release goes out without them otherwise.
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: demos
+          path: out/demos
       - name: Publish the rolling release
         id: release
         env:
@@ -450,10 +458,11 @@ jobs:
           } > out/notes.md
           cat out/notes.md
           setups=$(ls out/installers/*-setup.exe 2> /dev/null || true)
+          demos=$(ls out/demos/demo-*.gif out/demos/demo-all.mp4 2> /dev/null || true)
           if [ -n "$setups" ]; then (cd out/installers && sha256sum -- *-setup.exe) >> out/SHA256SUMS; fi
           # shellcheck disable=SC2086 # one word per installer
           KEY=$key python3 -I kit/ci/publish-release.py "$tag" "$GITHUB_SHA" \
-            "Ghostty for Windows $tag" out/notes.md out/*.zip $setups out/SHA256SUMS
+            "Ghostty for Windows $tag" out/notes.md out/*.zip $setups $demos out/SHA256SUMS
 
   # ghostty-for-windows on PyPI (pypi/): the launcher package, repacked into one wheel per
   # architecture with the build's whole zip inside (pypi/bundle.py). Its version is the
@@ -702,3 +711,69 @@ jobs:
         with:
           name: bench-${{ matrix.arch }}
           path: bench/bench.json
+
+  # The feature demos, one GIF per family (ci/demo/scenes/<n>-<family>.scene) and one MP4: recorded
+  # on a GitHub runner (never anyone's desktop) through the test pipe by demo.exe, then read
+  # frame by frame for names and paths (ci/demo/privacy-check.py) before they may be published.
+  # Never a gate: a failure only leaves them out of the release.
+  demo:
+    needs: [build, winprobes]
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ghostty-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: winprobes
+          path: probes
+      - name: Record the scenes
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist -Filter '*-windows-x86_64.zip' | Select-Object -First 1
+          Expand-Archive $zip.FullName -DestinationPath pkg
+          $exe = (Get-ChildItem pkg -Recurse -Filter ghostty.exe | Select-Object -First 1).FullName
+          New-Item -ItemType Directory -Force C:\demo | Out-Null
+          # The words no frame may show: the machine's name and the user's.
+          "$env:COMPUTERNAME $env:USERNAME" | Set-Content machine.txt -Encoding utf8
+          # A neutral shell: the prompt is "PS> ", the title "pwsh", in C:\demo.
+          $init = "function prompt { 'PS> ' }; `$Host.UI.RawUI.WindowTitle = 'pwsh'; Set-Location C:\demo; Clear-Host"
+          $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($init))
+          ./probes/x86_64/demo.exe $exe ci\demo\scenes frames -- "--command=pwsh -NoLogo -NoProfile -NoExit -EncodedCommand $enc" "--working-directory=C:\demo" "--window-padding-x=10"
+          Get-ChildItem frames -Directory | ForEach-Object { "{0}: {1} frames" -f $_.Name, (Get-ChildItem $_.FullName -Filter 'f*').Count }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demo-frames
+          path: |
+            frames/
+            machine.txt
+
+  demo-assemble:
+    needs: demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: demo-frames
+          path: rec
+      - run: sudo apt-get install -y -q ffmpeg tesseract-ocr > /dev/null
+      - name: Every frame read for names and paths
+        run: python3 -I -X utf8 ci/demo/privacy-check.py rec/frames rec/machine.txt | tee privacy.txt
+      - name: The GIFs and the MP4
+        run: |
+          ci/demo/assemble.sh rec/frames demos
+          {
+            echo "### Demos (privacy check passed)"
+            echo
+            ls -l demos | awk 'NR > 1 { printf "- `%s`: %.1f MB\n", $9, $5 / 1048576 }'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demos
+          path: demos/

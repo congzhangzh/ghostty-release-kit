@@ -1,0 +1,12 @@
+# commands: the palette (Ctrl+Shift+P) runs "split right"; reload the config
+sleep 500
+key p ctrl,shift
+sleep 1000
+vtype split right
+sleep 900
+vkey enter
+sleep 1200
+text echo the palette split it\n
+sleep 900
+key , ctrl,shift
+sleep 1500
