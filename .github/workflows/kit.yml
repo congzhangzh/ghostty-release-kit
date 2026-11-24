@@ -706,7 +706,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     env:
-      PYS_REF: e071602d92136a08a7fe263bf71eac35aabf8e52   # py-screen's feature-notify-forward
+      PYS_VERSION: "20261124.2"   # py-screen from PyPI: the first release with the forwarding (tag = e071602)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -715,10 +715,10 @@ jobs:
           path: dist
           merge-multiple: true
       - uses: astral-sh/setup-uv@v6
-      - name: pys, from py-screen at ${{ env.PYS_REF }}
+      - name: pys, py-screen ${{ env.PYS_VERSION }} from PyPI
         shell: pwsh
         run: |
-          uv tool install "py-screen @ git+https://github.com/congzhangzh/py-screen@$env:PYS_REF"
+          uv tool install "py-screen==$env:PYS_VERSION"
           uv tool dir --bin | Add-Content $env:GITHUB_PATH -Encoding utf8
           uv tool list
       - name: pys inside Ghostty
