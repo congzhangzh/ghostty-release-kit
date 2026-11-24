@@ -322,6 +322,17 @@ Check ($left.Count -eq 0) "no OpenConsole.exe left running 15 s after the probes
 
 # --- 4. Ghostty starts and draws
 Section '4. Ghostty: start, window, OpenGL, drawing'
+# Every other program's window minimized first: a screenshot of Ghostty's screen rect then
+# shows Ghostty, not what covers it (runs 45223332720 and 45299576933: windows-11-arm's setup
+# dialog covered the fonts step's pane); the taskbar and the desktop stay.
+function Hide-Others {
+	foreach ($o in [W]::OtherTopWindows([uint32]0)) {
+		$c = [W]::Class($o)
+		if ($c -in 'Shell_TrayWnd', 'Shell_SecondaryTrayWnd', 'Progman', 'WorkerW') { continue }
+		[void][W]::ShowWindow($o, 11)  # SW_FORCEMINIMIZE
+	}
+}
+Hide-Others
 # The package brings Mesa in opengl\ when its source falls back to it (wgl.zig). Without it
 # (an older build) and with the in-box OpenGL below 4.3, Mesa's llvmpipe is put there for the test.
 if (Test-Path "$pkg\opengl\opengl32.dll") {
@@ -480,6 +491,7 @@ if (-not $hasPipe -or -not $bash -or -not $py) {
 	Say 'info' "not tried: $(if (-not $hasPipe) { 'no test-control pipe' } elseif (-not $bash) { 'no Git Bash' } else { 'no python' })"
 } else {
 	Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+	Hide-Others
 	$fontsOut = Join-Path $Out 'fonts'
 	$script = (Resolve-Path (Join-Path $PSScriptRoot 'fonts-test.sh')).Path -replace '\\', '/'
 	$env:RUN = ''; $env:PY = 'python'; $env:PYTHONUTF8 = '1'
