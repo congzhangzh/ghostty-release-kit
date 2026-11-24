@@ -759,6 +759,7 @@ jobs:
           name: demo-frames
           path: |
             frames/
+            !frames/*/appdata/
             machine.txt
 
   demo-assemble:

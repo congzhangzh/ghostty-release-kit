@@ -553,6 +553,14 @@ int main(int argc, char** argv) {
 		CreateDirectoryA(g_scene_dir, NULL);
 		logf_("# scene %s\n", base);
 		PROCESS_INFORMATION pi;
+		/* Settings of its own: the theme or font a scene picks from the menu is saved in the user's
+		   config, and run 45304911856's later scenes all inherited the look scene's light theme.
+		   Each Ghostty gets a fresh LOCALAPPDATA (Ghostty's config lives in %LOCALAPPDATA%\ghostty),
+		   so no scene sees another's, and no real user's config is ever touched. */
+		char appdata[MAX_PATH];
+		snprintf(appdata, sizeof appdata, "%s\\appdata", g_scene_dir);
+		CreateDirectoryA(appdata, NULL);
+		SetEnvironmentVariableA("LOCALAPPDATA", appdata);
 		snprintf(path, sizeof path, "%s\\ghostty.log", g_scene_dir);
 		if (!start_ghostty(exe, cmd, path, &pi)) continue;
 		if (i == 0) {
