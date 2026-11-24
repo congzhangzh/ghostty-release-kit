@@ -7,8 +7,10 @@ The demos are recorded on a GitHub runner, never on the owner's desktop. Still, 
 published, every frame is read (OCR, tesseract) and checked for: the runner's machine name and
 user name (machine.txt, written by the recording job), any home folder (C:\\Users\\<name>,
 /home/<name>), the runner's workspace (\\a\\ or /a/ paths), an e-mail address, and an IP other
-than 127.0.0.1. One hit fails the check (exit 1), and the demos are not published. Every frame is
-read. OCR can miss text, so the first published set is also looked at by a person.
+than 127.0.0.1, and the runner's own windows (GUIDs, its agent log's words). One hit fails the
+check (exit 1), and the demos are not published. Every frame is read. OCR finds only what it is
+told to look for and can misread text, so a person also looks at the frames before a set is
+first published (run 45298827734: the check passed a frame the look refused).
 """
 import pathlib
 import re
@@ -26,6 +28,10 @@ def main() -> int:
         re.compile(r"[\\/]a[\\/]ghostty-release-kit", re.I),
         re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+"),
         re.compile(r"\b(?!127\.0\.0\.1\b)(?:\d{1,3}\.){3}\d{1,3}\b"),
+        # the runner's own windows (run 45298827734: its agent console's log showed in a
+        # whole-screen scene): ids and the words of its log
+        re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", re.I),
+        re.compile(r"hosted.?compute|orchestration|correlation|traceparent|runner\w*\.log", re.I),
     ]
     files = sorted(p for p in frames.rglob("f*.*") if p.suffix in (".png", ".bmp"))
     hits = 0

@@ -2,9 +2,9 @@
  *
  *   demo.exe <ghostty.exe> <scenes dir> <out dir> [-- <ghostty arguments>...]
  *
- * Starts ghostty.exe with GHOSTTY_TEST_CONTROL=1 (and the arguments after --), sets the screen to
- * 1920x1080 when the display allows it, waits for the first window, gives it 1100x680, then plays
- * every <scenes dir>\*.scene in name order. While a scene plays, a second thread grabs Ghostty's
+ * Sets the screen to 1920x1080 when the display allows it, then plays every <scenes dir>\*.scene
+ * in name order, each in a Ghostty of its own (started with GHOSTTY_TEST_CONTROL=1 and the
+ * arguments after --, its window 1100x680, every other window minimized), so each starts clean. While a scene plays, a second thread grabs Ghostty's
  * window from the screen (popups over it included) about 10 times a second into
  * <out>\<scene>\f%05d.png, and <out>\<scene>\frames.txt lists each frame and how long it stayed
  * (ffmpeg's concat format, for the GIF and MP4 assembly on Linux).
@@ -23,6 +23,8 @@
  *   vtype <text>              real typing (SendInput, Unicode): into the palette, a dialog
  *   clickrect <name>          a real click at the middle of a rect "list" names: "<name>":[x,y,w,h]
  *                             (screen coordinates), e.g. the help button, "help"
+ *   menuinvoke <text>         the first window-menu item whose text contains <text> (as {"cmd":
+ *                             "menu"} lists it), invoked by id: fonts and shells differ by machine
  *   capture window|screen     what the frames show from now on: Ghostty's window (the default),
  *                             or the whole screen (a toast at its corner)
  *   # ...                     a comment
@@ -34,6 +36,7 @@
 #include <windows.h>
 #include <wincodec.h>
 #include <shlwapi.h>
+#include <dwmapi.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -75,6 +78,29 @@ static char* ctl_line(const char* req) { /* req: a JSON object; returns the answ
 
 /* ---- the window, the screen and the mouse --------------------------------- */
 
+/* The window's visible frame. GetWindowRect includes the invisible resize border (about 7 px
+   each side but the top), which is see-through: run 45298827734's frames showed a console's
+   text behind it. */
+static void frame_rect(RECT* r) {
+	if (FAILED(DwmGetWindowAttribute(g_hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, r, sizeof *r))) GetWindowRect(g_hwnd, r);
+}
+
+/* Every other visible top-level window minimized (the runner agent's console showed its log in
+   run 45298827734's whole-screen scene), named in the log; the taskbar and desktop stay. */
+static BOOL CALLBACK hide_other(HWND h, LPARAM l) {
+	(void)l;
+	DWORD pid;
+	GetWindowThreadProcessId(h, &pid);
+	char cls[64] = "", title[128] = "";
+	GetClassNameA(h, cls, sizeof cls);
+	GetWindowTextA(h, title, sizeof title);
+	if (pid == g_pid || !IsWindowVisible(h) || IsIconic(h) || !title[0]) return TRUE;
+	if (!strcmp(cls, "Shell_TrayWnd") || !strcmp(cls, "Progman") || !strcmp(cls, "WorkerW") || !strcmp(cls, "Shell_SecondaryTrayWnd")) return TRUE;
+	logf_("#   minimized another window: class %s\n", cls);
+	ShowWindow(h, SW_FORCEMINIMIZE);
+	return TRUE;
+}
+
 static BOOL CALLBACK find_win(HWND h, LPARAM l) {
 	(void)l;
 	DWORD pid;
@@ -109,7 +135,7 @@ static void mouse_at(int x, int y, DWORD flags) {
 static POINT g_mouse;
 static void to_screen(double fx, double fy, int* x, int* y) {
 	RECT r;
-	GetWindowRect(g_hwnd, &r);
+	frame_rect(&r);
 	*x = r.left + (int)(fx * (r.right - r.left));
 	*y = r.top + (int)(fy * (r.bottom - r.top));
 }
@@ -244,7 +270,7 @@ static DWORD WINAPI recorder(LPVOID arg) {
 	while (g_recording) {
 		RECT r;
 		if (g_whole_screen) SetRect(&r, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
-		else GetWindowRect(g_hwnd, &r);
+		else frame_rect(&r);
 		int w = r.right - r.left, h = r.bottom - r.top;
 		/* clip to the screen (a maximized window's border lies beyond it), even sizes for video */
 		if (r.left < 0) { w += r.left; r.left = 0; }
@@ -389,6 +415,23 @@ static void play(const char* file) {
 				mouse_at(x + w / 2, y + h / 2, MOUSEEVENTF_LEFTUP);
 			} else logf_("# clickrect %s: not in list\n", rest);
 			free(r);
+		} else if (!strcmp(a, "menuinvoke")) {
+			char* r = ctl_line("{\"cmd\":\"menu\"}");
+			int id = -1;
+			for (char* it = r ? strstr(r, "{\"id\":") : NULL; it && id < 0; it = strstr(it + 1, "{\"id\":")) {
+				char* end = strchr(it, '}');
+				char* tx = strstr(it, "\"text\":\"");
+				if (tx && end && tx < end) {
+					tx += 8;
+					char* q = strchr(tx, '"');
+					if (q && (size_t)(q - tx) >= strlen(rest) && strstr(tx, rest) && strstr(tx, rest) < q) id = atoi(it + 6);
+				}
+			}
+			free(r);
+			if (id >= 0) {
+				snprintf(req, sizeof req, "{\"cmd\":\"menu\",\"invoke\":%d}", id);
+				free(ctl_line(req));
+			} else logf_("# menuinvoke %s: no such item\n", rest);
 		} else if (!strcmp(a, "capture")) {
 			g_whole_screen = !strcmp(rest, "screen");
 		} else if (!strcmp(a, "vkey")) {
@@ -404,6 +447,55 @@ static void play(const char* file) {
 
 static int cmp(const void* a, const void* b) { return strcmp(*(char* const*)a, *(char* const*)b); }
 
+/* Ghostty started for one scene (each scene starts clean: one window, one tab, one pane),
+   its pipe open, its window placed and in front. Returns 0 on failure. */
+static int start_ghostty(const char* exe, const char* cmdline, const char* logpath, PROCESS_INFORMATION* pi) {
+	SECURITY_ATTRIBUTES sa = {sizeof sa, NULL, TRUE};
+	HANDLE logh = CreateFileA(logpath, GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS, 0, NULL);
+	STARTUPINFOA si = {sizeof si};
+	si.dwFlags = STARTF_USESTDHANDLES;
+	si.hStdError = logh;
+	si.hStdOutput = logh;
+	char cmd[8192];
+	snprintf(cmd, sizeof cmd, "%s", cmdline);
+	if (!CreateProcessA(exe, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, pi)) { logf_("FAIL start: %lu\n", GetLastError()); return 0; }
+	CloseHandle(logh);
+	g_pid = pi->dwProcessId;
+	g_hwnd = NULL;
+	g_pipe = INVALID_HANDLE_VALUE;
+	char pipe[64];
+	snprintf(pipe, sizeof pipe, "\\\\.\\pipe\\ghostty-%lu.ctl", g_pid);
+	for (int t = 0; t < 30000 && g_pipe == INVALID_HANDLE_VALUE; t += 250) {
+		g_pipe = CreateFileA(pipe, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+		if (g_pipe == INVALID_HANDLE_VALUE) Sleep(250);
+	}
+	if (g_pipe == INVALID_HANDLE_VALUE) { logf_("FAIL no test pipe\n"); return 0; }
+	for (int t = 0; t < 30000 && !g_hwnd; t += 250) { EnumWindows(find_win, 0); if (!g_hwnd) Sleep(250); }
+	if (!g_hwnd) { logf_("FAIL no window\n"); return 0; }
+	EnumWindows(hide_other, 0);
+	/* 1100x680, or what fits a smaller screen (a runner's default is 1024x768) */
+	int ww = 1100, wh = 680, scw = GetSystemMetrics(SM_CXSCREEN), sch = GetSystemMetrics(SM_CYSCREEN);
+	if (ww > scw - 24) ww = scw - 24;
+	if (wh > sch - 88) wh = sch - 88;
+	int sx = (scw - ww) / 2, sy = (sch - 48 - wh) / 2;
+	snprintf(cmd, sizeof cmd, "{\"cmd\":\"window\",\"rect\":[%d,%d,%d,%d]}", sx < 0 ? 0 : sx, sy < 0 ? 0 : sy, ww, wh);
+	free(ctl_line(cmd));
+	SetForegroundWindow(g_hwnd);
+	GetCursorPos(&g_mouse);
+	Sleep(3000); /* the shell's first prompt */
+	return 1;
+}
+
+static void stop_ghostty(PROCESS_INFORMATION* pi) {
+	if (g_pipe != INVALID_HANDLE_VALUE) CloseHandle(g_pipe);
+	g_pipe = INVALID_HANDLE_VALUE;
+	TerminateProcess(pi->hProcess, 0);
+	WaitForSingleObject(pi->hProcess, 10000);
+	CloseHandle(pi->hProcess);
+	CloseHandle(pi->hThread);
+	Sleep(500);
+}
+
 int main(int argc, char** argv) {
 	if (argc < 4) { fprintf(stderr, "usage: demo.exe <ghostty.exe> <scenes dir> <out dir> [-- <ghostty args>]\n"); return 2; }
 	const char *exe = argv[1], *scenes = argv[2], *out = argv[3];
@@ -418,7 +510,7 @@ int main(int argc, char** argv) {
 	}
 	screen_1080p();
 
-	/* Ghostty, with the arguments after "--" */
+	/* Ghostty's command line, with the arguments after "--" */
 	char cmd[8192];
 	snprintf(cmd, sizeof cmd, "\"%s\"", exe);
 	for (int i = 4; i < argc; i++) {
@@ -430,40 +522,10 @@ int main(int argc, char** argv) {
 	SetEnvironmentVariableA("GHOSTTY_TEST_CONTROL", "1");
 	SetEnvironmentVariableA("GHOSTTY_WHATSNEW", "off");
 	SetEnvironmentVariableA("GHOSTTY_LOG", "stderr");
-	snprintf(path, sizeof path, "%s\\ghostty.log", out);
-	SECURITY_ATTRIBUTES sa = {sizeof sa, NULL, TRUE};
-	HANDLE logh = CreateFileA(path, GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS, 0, NULL);
-	STARTUPINFOA si = {sizeof si};
-	si.dwFlags = STARTF_USESTDHANDLES;
-	si.hStdError = logh;
-	si.hStdOutput = logh;
-	PROCESS_INFORMATION pi;
-	if (!CreateProcessA(exe, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) { logf_("FAIL start: %lu\n", GetLastError()); return 1; }
-	g_pid = pi.dwProcessId;
-	char pipe[64];
-	snprintf(pipe, sizeof pipe, "\\\\.\\pipe\\ghostty-%lu.ctl", g_pid);
-	for (int t = 0; t < 30000 && g_pipe == INVALID_HANDLE_VALUE; t += 250) {
-		g_pipe = CreateFileA(pipe, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
-		if (g_pipe == INVALID_HANDLE_VALUE) Sleep(250);
-	}
-	if (g_pipe == INVALID_HANDLE_VALUE) { logf_("FAIL no test pipe\n"); TerminateProcess(pi.hProcess, 1); return 1; }
-	for (int t = 0; t < 30000 && !g_hwnd; t += 250) { EnumWindows(find_win, 0); if (!g_hwnd) Sleep(250); }
-	if (!g_hwnd) { logf_("FAIL no window\n"); TerminateProcess(pi.hProcess, 1); return 1; }
-	/* 1100x680, or what fits a smaller screen (a runner's default is 1024x768) */
-	int ww = 1100, wh = 680, scw = GetSystemMetrics(SM_CXSCREEN), sch = GetSystemMetrics(SM_CYSCREEN);
-	if (ww > scw - 24) ww = scw - 24;
-	if (wh > sch - 88) wh = sch - 88;
-	int sx = (scw - ww) / 2, sy = (sch - 48 - wh) / 2;
-	logf_("# window %dx%d on a %dx%d screen\n", ww, wh, scw, sch);
-	snprintf(cmd, sizeof cmd, "{\"cmd\":\"window\",\"rect\":[%d,%d,%d,%d]}", sx < 0 ? 0 : sx, sy < 0 ? 0 : sy, ww, wh);
-	free(ctl_line(cmd));
-	SetForegroundWindow(g_hwnd);
-	GetCursorPos(&g_mouse);
-	Sleep(3000); /* the shell's first prompt */
 
-	/* the scenes, in name order */
+	/* the scenes, in name order, each in a Ghostty of its own */
 	char* names[64];
-	int nn = 0;
+	int nn = 0, done = 0;
 	WIN32_FIND_DATAA fd;
 	snprintf(path, sizeof path, "%s\\*.scene", scenes);
 	HANDLE fh = FindFirstFileA(path, &fd);
@@ -479,6 +541,14 @@ int main(int argc, char** argv) {
 		snprintf(g_scene_dir, sizeof g_scene_dir, "%s\\%s", out, base);
 		CreateDirectoryA(g_scene_dir, NULL);
 		logf_("# scene %s\n", base);
+		PROCESS_INFORMATION pi;
+		snprintf(path, sizeof path, "%s\\ghostty.log", g_scene_dir);
+		if (!start_ghostty(exe, cmd, path, &pi)) continue;
+		if (i == 0) {
+			RECT r;
+			frame_rect(&r);
+			logf_("# window %ldx%ld on a %dx%d screen\n", r.right - r.left, r.bottom - r.top, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+		}
 		g_recording = 1;
 		g_whole_screen = 0;
 		HANDLE th = CreateThread(NULL, 0, recorder, NULL, 0, NULL);
@@ -490,8 +560,9 @@ int main(int argc, char** argv) {
 		WaitForSingleObject(th, 10000);
 		CloseHandle(th);
 		logf_("#   %lu ms\n", GetTickCount() - t0);
+		stop_ghostty(&pi);
+		done++;
 	}
-	TerminateProcess(pi.hProcess, 0);
-	logf_("ok demo: %d scenes in %s\n", nn, out);
-	return 0;
+	logf_("%s demo: %d of %d scenes in %s\n", done == nn ? "ok" : "FAIL", done, nn, out);
+	return done == nn ? 0 : 1;
 }

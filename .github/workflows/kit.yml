@@ -239,7 +239,7 @@ jobs:
             zig cc -target $a-windows-gnu -O2 ci/winprobe/emit.c -o probes/$a/emit.exe
             zig cc -target $a-windows-gnu -O2 ci/winprobe/e2e.c -o probes/$a/e2e.exe
             zig cc -target $a-windows-gnu -O2 ci/winprobe/catbench.c -o probes/$a/catbench.exe
-            zig cc -target $a-windows-gnu -O2 ci/winprobe/demo.c -lole32 -lwindowscodecs -lshlwapi -luser32 -lgdi32 -o probes/$a/demo.exe
+            zig cc -target $a-windows-gnu -O2 ci/winprobe/demo.c -lole32 -lwindowscodecs -lshlwapi -ldwmapi -luser32 -lgdi32 -o probes/$a/demo.exe
           done
           rm -f probes/*/*.pdb
           ls -l probes/*
@@ -368,7 +368,7 @@ jobs:
   # On a push to main whose pin or package inputs changed, and only when the gate is green: the
   # rolling release <YYYYMMDD>.<N>, published once and never replaced.
   publish:
-    needs: [changes, build, gate, installer-test, demo-assemble]
+    needs: [changes, build, gate, installer-test]
     outputs:
       tag: ${{ steps.release.outputs.tag }}
     # always(): without a status function GitHub adds success(), which checks every job upstream
@@ -402,13 +402,21 @@ jobs:
         with:
           name: installers
           path: out/installers
-      # The feature demos (ci/demo/), only when their frames passed the privacy check: the
-      # artifact exists only then; the release goes out without them otherwise.
-      - uses: actions/download-artifact@v4
+      # The feature demos (ci/demo/): only a set a person has looked at, frame by frame. The
+      # repository variable DEMOS_OK names the run whose demos were approved after that look (its
+      # OCR check passed too, or the artifact would not exist); they are taken from that run.
+      # Unset, or that run's artifact gone: the release goes out without demos. A run's own demos
+      # are never published on its automatic check alone (run 45298827734: the check passed
+      # frames the look refused).
+      - name: The approved demos (vars.DEMOS_OK)
+        if: vars.DEMOS_OK != ''
         continue-on-error: true
-        with:
-          name: demos
-          path: out/demos
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEMOS_OK: ${{ vars.DEMOS_OK }}
+        run: |
+          gh run download "$DEMOS_OK" -R "$GITHUB_REPOSITORY" -n demos -D out/demos
+          ls -l out/demos
       - name: Publish the rolling release
         id: release
         env:
@@ -714,8 +722,8 @@ jobs:
 
   # The feature demos, one GIF per family (ci/demo/scenes/<n>-<family>.scene) and one MP4: recorded
   # on a GitHub runner (never anyone's desktop) through the test pipe by demo.exe, then read
-  # frame by frame for names and paths (ci/demo/privacy-check.py) before they may be published.
-  # Never a gate: a failure only leaves them out of the release.
+  # frame by frame for names and paths (ci/demo/privacy-check.py). Publishing takes only a set a
+  # person approved after looking at every frame (vars.DEMOS_OK, the approved run). Never a gate.
   demo:
     needs: [build, winprobes]
     runs-on: windows-latest
