@@ -146,7 +146,7 @@ function Run-Case([string] $name, [bool] $forward) {
 		$b = Wait-Event 1000 @('"kind":"bell"')
 		Say 'info' "${name}: Ghostty bell event: $(if ($b) { $b } else { 'none (pys keeps a bell: it marks the window)' })"
 		$j = Pys @('ls', '--json')
-		Say 'info' "${name}: pys ls: $(([regex]::Matches($j, '"progress":\s*[^,\]}]*[\]}]?') | ForEach-Object Value) -join ' ')"
+		Say 'info' "${name}: pys ls: $(([regex]::Matches($j, '"progress":\s*(null|\[[^\]]*\])') | ForEach-Object Value) -join ', ')"
 	} finally {
 		Pys @('kill') | Out-Null
 		Start-Sleep -Seconds 2
