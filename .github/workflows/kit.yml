@@ -414,8 +414,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEMOS_OK: ${{ vars.DEMOS_OK }}
+          # The families that passed the look, e.g. "workspace look commands"; unset = all of them.
+          # With a list, only those GIFs ship, and demo-all.mp4 (every scene) never does.
+          DEMOS_FAMILIES: ${{ vars.DEMOS_FAMILIES }}
         run: |
           gh run download "$DEMOS_OK" -R "$GITHUB_REPOSITORY" -n demos -D out/demos
+          if [ -n "$DEMOS_FAMILIES" ]; then
+            rm -f out/demos/demo-all.mp4
+            for f in out/demos/demo-*.gif; do
+              fam=$(basename "$f" .gif); fam=${fam#demo-}; fam=${fam#[0-9]-}
+              case " $DEMOS_FAMILIES " in *" $fam "*) ;; *) rm -f "$f" ;; esac
+            done
+          fi
           ls -l out/demos
       - name: Publish the rolling release
         id: release
