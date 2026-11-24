@@ -698,6 +698,45 @@ jobs:
   # on a GitHub runner (never anyone's desktop) through the test pipe by demo.exe, then read
   # frame by frame for names and paths (ci/demo/privacy-check.py). Publishing takes only a set a
   # person approved after looking at every frame (vars.DEMOS_OK, the approved run). Never a gate.
+  # pys (py-screen) inside Ghostty on real Windows: a background pys window's notification and
+  # progress reach Ghostty's tab (pys's FORWARD_NOTIFY), and not with FORWARD_NOTIFY = False.
+  # Reported, not required (not in the gate): pys is its own project, pinned here by commit.
+  pys:
+    needs: [build]
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      PYS_REF: e071602d92136a08a7fe263bf71eac35aabf8e52   # py-screen's feature-notify-forward
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ghostty-*
+          path: dist
+          merge-multiple: true
+      - uses: astral-sh/setup-uv@v6
+      - name: pys, from py-screen at ${{ env.PYS_REF }}
+        shell: pwsh
+        run: |
+          uv tool install "py-screen @ git+https://github.com/congzhangzh/py-screen@$env:PYS_REF"
+          uv tool dir --bin | Add-Content $env:GITHUB_PATH -Encoding utf8
+          uv tool list
+      - name: pys inside Ghostty
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist -Filter '*-windows-x86_64.zip' | Select-Object -First 1
+          ./ci/test-pys.ps1 -Zip $zip.FullName -Out pystest
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pystest
+          path: |
+            pystest/results.md
+            pystest/*/wire.log
+            pystest/*/ghostty.log
+          if-no-files-found: ignore
+
   demo:
     needs: [build, winprobes]
     runs-on: windows-latest
