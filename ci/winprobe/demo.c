@@ -21,8 +21,9 @@
  *   vkey <combo>              a real key press (SendInput), e.g. "alt+space", "down", "enter",
  *                             "ctrl+shift+p": for what the pipe's keys can't reach (menus, popups)
  *   vtype <text>              real typing (SendInput, Unicode): into the palette, a dialog
- *   clickrect <name>          a real click at the middle of a rect "list" names: "<name>":[x,y,w,h]
- *                             (screen coordinates), e.g. the help button, "help"
+ *   clickrect <name> [<x> <y>]   a real click at the middle of a rect "list" names: "<name>":[x,y,w,h]
+ *                             (screen coordinates), e.g. the help button, "help"; when "list" has
+ *                             none, at <x> <y> of the window (as "click") if they are given
  *   menuinvoke <text>         the first window-menu item whose text contains <text> (as {"cmd":
  *                             "menu"} lists it), invoked by id: fonts and shells differ by machine
  *   hold <ms>                 take no frames for ms (the last one stays on): over a change of
@@ -425,7 +426,25 @@ static void play(const char* file) {
 				mouse_at(x + w / 2, y + h / 2, MOUSEEVENTF_LEFTDOWN);
 				Sleep(60);
 				mouse_at(x + w / 2, y + h / 2, MOUSEEVENTF_LEFTUP);
-			} else logf_("# clickrect %s: not in list\n", rest);
+			} else {
+				char nm[64];
+				double fx, fy;
+				if (sscanf(rest, "%63s %lf %lf", nm, &fx, &fy) == 3) {
+					/* a build whose "list" names no such rect: the place the scene gives */
+					snprintf(key, sizeof key, "\"%s\":[", nm);
+					at = r ? strstr(r, key) : NULL;
+					if (at && sscanf(at + strlen(key), "%d,%d,%d,%d", &x, &y, &w, &h) == 4) {
+						x += w / 2, y += h / 2;
+					} else {
+						to_screen(fx, fy, &x, &y);
+						logf_("# clickrect %s: not in list, at %.3f %.3f of the window\n", nm, fx, fy);
+					}
+					glide(x, y, 300);
+					mouse_at(x, y, MOUSEEVENTF_LEFTDOWN);
+					Sleep(60);
+					mouse_at(x, y, MOUSEEVENTF_LEFTUP);
+				} else logf_("# clickrect %s: not in list\n", rest);
+			}
 			free(r);
 		} else if (!strcmp(a, "menuinvoke")) {
 			/* "font:<text>" and "shell:<text>" look only in lane A's Font (0x2000-0x23FF) and Shell

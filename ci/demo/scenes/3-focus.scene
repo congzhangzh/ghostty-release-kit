@@ -30,9 +30,9 @@ move 0.5 0.5 300
 sleep 200
 move 0.5 0.0 700
 sleep 1500
-# the bar's "?" (left of its exit button, each 46 px at the runner's 96 dpi): the overview.
-# "list" names no "help" in full screen (the bar is a popup), so it's clicked by its place.
-click 0.964 0.012
+# the bar's "?": the overview. "list" names it while the bar shows (lane A, 69f1c5a73); an
+# older build names none, and then it's clicked by its place (46 px buttons at 96 dpi).
+clickrect help 0.964 0.012
 sleep 2200
 vkey escape
 sleep 600
