@@ -25,8 +25,10 @@
  *                             (screen coordinates), e.g. the help button, "help"
  *   menuinvoke <text>         the first window-menu item whose text contains <text> (as {"cmd":
  *                             "menu"} lists it), invoked by id: fonts and shells differ by machine
- *   capture window|screen     what the frames show from now on: Ghostty's window (the default),
- *                             or the whole screen (a toast at its corner)
+ *   capture window|corner|screen   what the frames show from now on: Ghostty's window (the
+ *                             default); "corner", from the window's top-left to the screen's
+ *                             bottom-right (the taskbar's tray and a toast, the window readable);
+ *                             or the whole screen
  *   # ...                     a comment
  * Each request and answer goes to <out>\demo-wire.log; a request that fails stops nothing.
  */
@@ -72,7 +74,7 @@ static char* ctl_line(const char* req) { /* req: a JSON object; returns the answ
 		buf[len++] = c;
 	}
 	buf[len] = 0;
-	if (g_wire) { fprintf(g_wire, "< %.500s\n", buf); fflush(g_wire); }
+	if (g_wire) { fprintf(g_wire, "< %.8000s\n", buf); fflush(g_wire); } /* the menu's whole list */
 	return buf;
 }
 
@@ -212,7 +214,7 @@ static void vtype(const char* utf8) {
 
 static IWICImagingFactory* g_wic;
 static volatile LONG g_recording;
-static volatile LONG g_whole_screen;
+static volatile LONG g_whole_screen; /* 0 window, 1 screen, 2 corner */
 static char g_scene_dir[MAX_PATH];
 
 static int save_png(const char* path, const BYTE* bgra, int w, int h) {
@@ -269,8 +271,11 @@ static DWORD WINAPI recorder(LPVOID arg) {
 	char prev[MAX_PATH] = "";
 	while (g_recording) {
 		RECT r;
-		if (g_whole_screen) SetRect(&r, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
-		else frame_rect(&r);
+		if (g_whole_screen == 1) SetRect(&r, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+		else {
+			frame_rect(&r);
+			if (g_whole_screen == 2) r.right = GetSystemMetrics(SM_CXSCREEN), r.bottom = GetSystemMetrics(SM_CYSCREEN);
+		}
 		int w = r.right - r.left, h = r.bottom - r.top;
 		/* clip to the screen (a maximized window's border lies beyond it), even sizes for video */
 		if (r.left < 0) { w += r.left; r.left = 0; }
@@ -416,6 +421,11 @@ static void play(const char* file) {
 			} else logf_("# clickrect %s: not in list\n", rest);
 			free(r);
 		} else if (!strcmp(a, "menuinvoke")) {
+			/* "font:<text>" and "shell:<text>" look only in lane A's Font (0x2000-0x23FF) and Shell
+			   (0x2400-0x27FF) items, so "Default" there is not the theme's */
+			int lo = 0, hi = 0x7fffffff;
+			if (!strncmp(rest, "font:", 5)) lo = 0x2000, hi = 0x23ff, rest += 5;
+			else if (!strncmp(rest, "shell:", 6)) lo = 0x2400, hi = 0x27ff, rest += 6;
 			char* r = ctl_line("{\"cmd\":\"menu\"}");
 			int id = -1;
 			for (char* it = r ? strstr(r, "{\"id\":") : NULL; it && id < 0; it = strstr(it + 1, "{\"id\":")) {
@@ -424,7 +434,8 @@ static void play(const char* file) {
 				if (tx && end && tx < end) {
 					tx += 8;
 					char* q = strchr(tx, '"');
-					if (q && (size_t)(q - tx) >= strlen(rest) && strstr(tx, rest) && strstr(tx, rest) < q) id = atoi(it + 6);
+					int cand = atoi(it + 6);
+					if (q && cand >= lo && cand <= hi && (size_t)(q - tx) >= strlen(rest) && strstr(tx, rest) && strstr(tx, rest) < q) id = cand;
 				}
 			}
 			free(r);
@@ -433,7 +444,7 @@ static void play(const char* file) {
 				free(ctl_line(req));
 			} else logf_("# menuinvoke %s: no such item\n", rest);
 		} else if (!strcmp(a, "capture")) {
-			g_whole_screen = !strcmp(rest, "screen");
+			g_whole_screen = !strcmp(rest, "screen") ? 1 : !strcmp(rest, "corner") ? 2 : 0;
 		} else if (!strcmp(a, "vkey")) {
 			vkey(rest);
 		} else if (!strcmp(a, "vtype")) {

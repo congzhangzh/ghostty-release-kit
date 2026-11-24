@@ -18,7 +18,5 @@ sleep 1400
 vkey ctrl+shift+f12
 sleep 1400
 # fonts from the window menu's Font list (the items depend on the machine's fonts)
-menuinvoke Consolas
-sleep 1500
-menuinvoke JetBrains
-sleep 1200
+menuinvoke font:Consolas
+sleep 1800

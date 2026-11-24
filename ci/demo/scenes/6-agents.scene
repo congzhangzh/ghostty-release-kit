@@ -1,6 +1,9 @@
 # agents: a notification from a background pane, taskbar progress, a new tab in the same folder
-capture screen
-sleep 500
+# the window low and to the right, and the frames from its corner to the screen's: the
+# taskbar's tray and the toast are in, and the window stays readable
+ctl {"cmd":"window","rect":[780,320,1100,680]}
+capture corner
+sleep 800
 text mkdir C:\demo\project -Force | Out-Null; cd C:\demo\project\n
 sleep 700
 ctl {"cmd":"action","action":"new_split:right"}
