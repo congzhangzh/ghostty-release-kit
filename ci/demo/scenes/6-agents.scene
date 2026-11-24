@@ -1,6 +1,10 @@
 # agents: several agents in one window, each saying when it needs you, inside the window:
 # a thin progress bar along a pane's top (red on an error), and a bell before a tab's title
-sleep 600
+# a smaller window, so the 880 px GIF shows the tab's bell and the 2-pt bar larger (the
+# frames' size is the window's): no frames until it has its size
+hold 1500
+ctl {"cmd":"window","rect":[560,290,800,500]}
+sleep 1500
 ctl {"cmd":"action","action":"new_split:right"}
 sleep 900
 # agent A, in the right pane: a long job with progress, then a bell when it's done

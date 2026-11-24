@@ -273,6 +273,9 @@ static DWORD WINAPI recorder(LPVOID arg) {
 	double last = 0;
 	int n = 0, fixed_w = 0, fixed_h = 0;
 	char prev[MAX_PATH] = "";
+	/* a moment for the scene's first line: a "hold" there (e.g. while it resizes the window)
+	   then covers the first frame too, so the scene's size is the one it chose */
+	Sleep(150);
 	while (g_recording) {
 		/* "hold": the frame before stays on screen (its duration grows to the next one) */
 		if ((LONG)(GetTickCount() - (DWORD)g_hold_until) < 0) { Sleep(20); continue; }
