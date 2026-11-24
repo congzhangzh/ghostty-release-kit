@@ -2,9 +2,10 @@ name: Build, test and publish Ghostty for Windows
 
 # Cross-compiles the Ghostty commit that sources.lock pins (or, on demand, another fork branch)
 # for Windows x64 and Arm64 with Zig on Linux, once (build); then tests those very zips in
-# parallel: x86_64 under Wine, the full set in ci/wine/ (wine-x64); aarch64 under Wine on an
-# arm64 Linux runner (wine-arm64); both on real Windows, windows-latest and windows-11-arm
-# (windows). The gate job gives the run one verdict: the build and every job in MUST_TEST
+# parallel: x86_64 under Wine, the full set in ci/wine/ (wine-x64); both on real Windows,
+# windows-latest and windows-11-arm (windows). (An aarch64-under-Wine job on an arm64 Linux
+# runner was dropped on 2026-11-24: the distribution's Wine 9.0 never finished creating its
+# prefix there, wineboot hung until the job's cap, and real Windows on Arm tests aarch64.) The gate job gives the run one verdict: the build and every job in MUST_TEST
 # passed; it also lists each job's minutes. On a push to main that passes the gate, publish
 # makes the rolling release <YYYYMMDD>.<N>, as rdp-release-kit does: the zips and SHA256SUMS,
 # as GitHub's latest release, published once and never replaced. A build whose inputs (the pin,
@@ -36,7 +37,7 @@ concurrency:
 env:
   ZIG_VERSION: 0.17.1
   # The test jobs the gate requires (and so a release): their job ids. The others run and are
-  # reported. wine-arm64 joins once it has proven itself on candidates.
+  # reported.
   MUST_TEST: wine-x64 windows
 
 jobs:
@@ -181,43 +182,6 @@ jobs:
             wine-x64/**/*.txt
           if-no-files-found: ignore
 
-  # aarch64 under Wine on an arm64 Linux runner (free for public repositories): the
-  # distribution's Wine runs Arm64 Windows programs natively. The first, fast test only.
-  wine-arm64:
-    needs: build
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 12 # not required yet: never hold the gate long
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: ghostty-${{ needs.build.outputs.VERSION }}
-          path: dist
-      - name: Wine (the distribution's) and the test tools
-        run: ci/wine/install-wine.sh distro
-      - name: Test aarch64 under Wine
-        env:
-          VERSION: ${{ needs.build.outputs.VERSION }}
-        run: |
-          zip=dist/ghostty-$VERSION-windows-aarch64.zip
-          [ -f "$zip" ] || { echo "::error::no aarch64 zip in the build"; exit 1; }
-          unzip -q "$zip" -d pkg
-          export GHOSTTY_WHATSNEW=off
-          set +e
-          xvfb-run -a -s "-screen 0 1280x800x24" ci/test-wine.sh "pkg/ghostty-$VERSION-windows-aarch64/ghostty.exe" wine-arm64
-          rc=$?
-          { echo "### aarch64 under Wine ($(wine --version))"; echo; echo '```'; cat wine-arm64/test.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          exit $rc
-      - name: Keep the results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: wine-arm64
-          path: |
-            wine-arm64/test.log
-            wine-arm64/ghostty.log
-          if-no-files-found: ignore
-
   # The probes the Windows job runs (ci/winprobe/*.c), cross-compiled here with the same Zig, one
   # set per architecture; seconds of work, so it runs beside the build.
   winprobes:
@@ -330,7 +294,7 @@ jobs:
   # One verdict per run: every job named in MUST_TEST passed (the other test jobs are reported,
   # not required), and each job's minutes, so the cost of the loop is on every run's page.
   gate:
-    needs: [changes, build, wine-x64, wine-arm64, windows, pypi-test, installer-test]
+    needs: [changes, build, wine-x64, windows, pypi-test, installer-test]
     if: always() && needs.build.result != 'skipped'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -345,7 +309,7 @@ jobs:
             echo
             echo "| job | result | required |"
             echo "|---|---|---|"
-            for j in build wine-x64 wine-arm64 windows pypi-test installer-test; do
+            for j in build wine-x64 windows pypi-test installer-test; do
               r=$(jq -r --arg j "$j" '.[$j].result' <<< "$NEEDS")
               req=no; case " build $MUST_TEST " in *" $j "*) req=yes ;; esac
               echo "| $j | $r | $req |"
