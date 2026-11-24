@@ -6,7 +6,8 @@
  * \\.\pipe\ghostty-<pid>.ctl (protocol 1, windows/testctl.c) and checks, step by step:
  *   hello; one window, one tab, one pane; a shell prompt; "echo e2e-ok" typed and its output
  *   read back; a new tab; a split; an OSC 9 notification and OSC 9;4 progress (written by
- *   emit.exe, as events); a resize changing the grid; closing the window.
+ *   emit.exe, as events); a real BEL from an unfocused pane (a bell event); a resize changing
+ *   the grid; closing the window.
  * Each step prints "ok   <what>" or "FAIL <what>: <why>" (also into <out>\e2e.log), and every
  * request and answer goes to <out>\e2e-wire.log. Exit 0 when all passed. The same exe runs
  * on Windows x64 and arm64 and under Wine.
@@ -343,6 +344,27 @@ int main(int argc, char **argv) {
 		else FAIL("a 2000-byte notification body: event %s, Ghostty %s", e ? "yes" : "none in 10 s", has(alive, "\"ok\":true") ? "answers" : "does not answer");
 		free(e);
 		free(alive);
+
+		/* A real BEL from that pane (lane A's f28f7329e: a bell event, and the tab marked for
+		   attention). ConPTY passes BEL through on Windows; Wine's console swallows it, and a host
+		   before f28f7329e has no bell event ("list" then names no "attention"). */
+		char *l0 = ctl("{\"cmd\":\"list\"}");
+		int knows_bell = has(l0, "\"attention\":");
+		free(l0);
+		int wine = GetProcAddress(GetModuleHandleA("ntdll.dll"), "wine_get_version") != NULL;
+		snprintf(line, sizeof line, "%s\"%s\" \"\\a\"", g_pwsh ? "& " : "", emit);
+		type_line_in(ids[1], line);
+		e = wait_event(&since, 8000, "\"kind\":\"bell\"", NULL);
+		if (e) {
+			OK("a real BEL from the split's unfocused pane: a bell event: %.200s", e);
+			char *l1 = ctl("{\"cmd\":\"list\"}");
+			if (has(l1, "\"attention\":true")) OK("the bell marks for attention in \"list\"");
+			else INFO("after the bell, \"list\" marks nothing for attention: %.300s", l1 ? l1 : "no answer");
+			free(l1);
+		} else if (!knows_bell) INFO("known: this host has no bell event (\"list\" names no \"attention\": before lane A's f28f7329e)");
+		else if (wine) INFO("known: no bell event under Wine (its console swallows BEL)");
+		else FAIL("a real BEL from the split's unfocused pane: no bell event in 8 s");
+		free(e);
 	}
 
 	/* Resize: the grid follows. */
