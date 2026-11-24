@@ -10,6 +10,9 @@ ctl {"cmd":"menu","invoke":4240}
 sleep 1300
 ctl {"cmd":"menu","invoke":4224}
 sleep 1300
+# a favourite pair (lane A: each favourite is a light/dark pair), then Auto -> Light -> Dark
+menuinvoke Catppuccin
+sleep 1300
 vkey ctrl+shift+f12
 sleep 1400
 vkey ctrl+shift+f12
