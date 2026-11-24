@@ -23,6 +23,23 @@ tools: frame timings, CPU and memory, tab titles. Only processes of your own use
 machine can open it, and it never carries what is on the screen. GHOSTTY_STATS_IPC=off turns it
 off.
 
+## Feature families
+
+Recorded by CI on a clean GitHub Windows runner (`ci/demo/`), and looked at frame by frame before
+they are published. These are from release 20261124.3.
+
+**Workspace**: tabs, splits you can drag and zoom, and a cheat sheet of the keys (Ctrl+Shift+?).
+
+![workspace](../../releases/download/20261124.3/demo-workspace.gif)
+
+**Look**: the window menu's themes and fonts, and light and dark pairs (Ctrl+Shift+F12).
+
+![look](../../releases/download/20261124.3/demo-look.gif)
+
+**Commands**: the command palette (Ctrl+Shift+P): type what you want, and it runs.
+
+![commands](../../releases/download/20261124.3/demo-commands.gif)
+
 ## What the port is
 
 Upstream Ghostty already had the parts under the app on Windows (ConPTY, fonts, libghostty-vt)
