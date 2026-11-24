@@ -720,6 +720,7 @@ jobs:
           Expand-Archive $zip.FullName -DestinationPath pkg
           $exe = (Get-ChildItem pkg -Recurse -Filter ghostty.exe | Select-Object -First 1).FullName
           New-Item -ItemType Directory -Force C:\demo | Out-Null
+          Copy-Item ci\demo\agents\*.ps1 C:\demo\   # the agents scene's two little agents
           # The words no frame may show: the machine's name and the user's.
           "$env:COMPUTERNAME $env:USERNAME" | Set-Content machine.txt -Encoding utf8
           # A neutral shell: the prompt is "PS> ", in C:\demo, every tab titled "PowerShell" (no
