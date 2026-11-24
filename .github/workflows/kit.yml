@@ -272,6 +272,43 @@ jobs:
           $zip = Get-ChildItem dist -Filter "*-windows-${{ matrix.arch }}.zip" | Select-Object -First 1
           if (-not $zip) { throw "no ${{ matrix.arch }} zip in the build artifact: $((Get-ChildItem dist).Name -join ', ')" }
           ./ci/test-windows.ps1 -Zip $zip.FullName -Probes probes/${{ matrix.arch }} -Out wintest -Mesa mesa -CompatPack
+      # The prompt line survives a split, a zoom and full screen (ci/resize-prompt-test.sh, lane A's
+      # resize-prompt-test.v2): Wine's console repaints on every resize, so only real ConPTY can show
+      # it; 20261124.6 blanked the cursor's row in cmd and PowerShell (on-demand run 45408970856),
+      # 20261124.7 keeps it (45412197785). About 25 s a case: x64 runs both presenters with the
+      # default shell (pwsh 7), Windows PowerShell and cmd, plus cmd without integration as the
+      # control; arm64 runs readback with the three shells.
+      - name: Unpack for the resize check
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist -Filter "*-windows-${{ matrix.arch }}.zip" | Select-Object -First 1
+          Expand-Archive -Path $zip.FullName -DestinationPath rpkg -Force
+          $exe = (Get-ChildItem rpkg -Recurse -Filter ghostty.exe | Select-Object -First 1).FullName
+          $share = (Get-ChildItem rpkg -Recurse -Directory -Filter ghostty | Where-Object { $_.Parent.Name -eq 'share' } | Select-Object -First 1).FullName
+          "GEXE=$($exe -replace '\\','/')" | Add-Content $env:GITHUB_ENV -Encoding utf8
+          "GSHARE=$($share -replace '\\','/')" | Add-Content $env:GITHUB_ENV -Encoding utf8
+      - name: The prompt line survives a split, a zoom and full screen (cmd, pwsh 7, Windows PowerShell)
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          RUN: ''
+          PY: python
+          PYTHONUTF8: '1'
+        run: |
+          set +e
+          if [ "${{ matrix.arch }}" = x86_64 ]; then presents="readback dxgi"; cases="detect: detect:powershell.exe detect:cmd.exe none:cmd.exe"
+          else presents="readback"; cases="detect: detect:powershell.exe detect:cmd.exe"; fi
+          mkdir -p resize; fails=0
+          for p in $presents; do for c in $cases; do
+            integ=${c%%:*}; cmd=${c#*:}; n=$p-$integ-${cmd:-default}
+            ./ci/resize-prompt-test.sh "$GEXE" "$GSHARE" "resize/$n" "$p" "$integ" $cmd > "resize/$n.stdout.txt" 2>&1; rc=$?
+            taskkill //F //IM ghostty.exe > /dev/null 2>&1
+            echo "$n: rc=$rc $(tail -1 "resize/$n.stdout.txt")" | tee -a resize/summary.txt
+            [ "$rc" = 0 ] || fails=$((fails + 1))
+          done; done
+          { echo "### The prompt line on a resize (${{ matrix.arch }})"; echo '```'; cat resize/summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $fails
       - name: Keep the results
         if: always()
         uses: actions/upload-artifact@v4
@@ -289,6 +326,10 @@ jobs:
             wintest/fonts.stderr
             wintest/fonts/*.json
             wintest/after-typing.bmp
+            resize/*.txt
+            resize/*/read-*.json
+            resize/*/shot-*.json
+            resize/*/ghostty.log
           if-no-files-found: ignore
 
   # One verdict per run: every job named in MUST_TEST passed (the other test jobs are reported,
