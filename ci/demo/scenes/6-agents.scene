@@ -1,22 +1,16 @@
-# agents: a notification from a background pane, taskbar progress, a new tab in the same folder
-# the window low and to the right, and the frames from its corner to the screen's: the
-# taskbar's tray and the toast are in, and the window stays readable
-ctl {"cmd":"window","rect":[780,320,1100,680]}
-capture corner
-sleep 800
-text mkdir C:\demo\project -Force | Out-Null; cd C:\demo\project\n
-sleep 700
+# agents: several agents in one window, each saying when it needs you, inside the window:
+# a thin progress bar along a pane's top (red on an error), and a bell before a tab's title
+sleep 600
 ctl {"cmd":"action","action":"new_split:right"}
 sleep 900
-text 0..100 | % { [Console]::Write("`e]9;4;1;$_`e\"); Start-Sleep -Milliseconds 30 }; [Console]::Write("`e]9;4;0`e\")\n
-sleep 4200
-ctl {"cmd":"action","action":"goto_split:left"}
-sleep 400
-text Start-Sleep 2; [Console]::Write("`e]777;notify;Build;finished in the other pane`e\")\n
-sleep 300
-ctl {"cmd":"action","action":"goto_split:right"}
-sleep 3500
+# agent A, in the right pane: a long job with progress, then a bell when it's done
+text 0..100 | % { [Console]::Write("`e]9;4;1;$_`e\"); Start-Sleep -Milliseconds 50 }; [Console]::Write("`e]9;4;0`e\"); "agent A: done, your turn"; [Console]::Write("`a")\n
+sleep 2500
+# meanwhile, a second tab: agent B, whose tests fail (the bar turns red)
 key t ctrl,shift
-sleep 1000
-text Get-Location\n
-sleep 1800
+sleep 1200
+text "agent B: 3 tests failing"; [Console]::Write("`e]9;4;2;60`e\")\n
+sleep 7500
+# agent A has rung: its tab has the bell. Back to it, and the bell goes.
+key tab ctrl
+sleep 2800
