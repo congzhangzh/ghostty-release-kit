@@ -169,6 +169,9 @@ jobs:
       - name: Leave out the Wine prefixes (their dosdevices links reach /, which the upload would walk)
         if: always()
         run: find wine-x64 -name wineprefix -type d -prune -exec rm -rf {} + 2> /dev/null || true
+      - name: Flag an exit-poll catch (a shell exit Windows did not report; a warning, not a failure)
+        if: always()
+        run: ci/exit-poll-flag.sh wine-x64 "Wine x86_64"
       - name: Keep the results
         if: always()
         continue-on-error: true # the test's verdict is the step above; a lost upload is no test failure
@@ -309,6 +312,12 @@ jobs:
           done; done
           { echo "### The prompt line on a resize (${{ matrix.arch }})"; echo '```'; cat resize/summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit $fails
+      - name: Flag an exit-poll catch (a shell exit Windows did not report; a warning, not a failure)
+        if: always()
+        shell: bash
+        run: |
+          ci/exit-poll-flag.sh wintest "Windows ${{ matrix.arch }}"
+          ci/exit-poll-flag.sh resize "Windows ${{ matrix.arch }}, the resize check"
       - name: Keep the results
         if: always()
         uses: actions/upload-artifact@v4
