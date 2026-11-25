@@ -56,11 +56,14 @@ function Run-One([string] $name, [int] $run) {
 	$before = @(Get-Process -ErrorAction SilentlyContinue | ForEach-Object Id)
 	switch ($name) {
 		'ghostty' {
-			$env:GHOSTTY_WHATSNEW = 'off'; $env:GHOSTTY_BATCH = '1'
+			$env:GHOSTTY_WHATSNEW = 'off'; $env:GHOSTTY_BATCH = '1'; $env:GHOSTTY_LOG = 'stderr'
 			# One argument: Start-Process joins its list unquoted, so "--command=a b c" must carry its
 			# own quotes or Ghostty gets --command=a and two stray arguments (run 45204591235: no
 			# Ghostty result on either arch, catbench ran without its file).
-			$p = Start-Process -FilePath $ghostty -ArgumentList "`"--command=$cat $data $result`"" -PassThru
+			# Its stderr kept (ghostty-<run>.log): catbench's exit ends the shell, the very place
+			# Ghostty's exit poll would have to catch it.
+			$p = Start-Process -FilePath $ghostty -ArgumentList "`"--command=$cat $data $result`"" -PassThru `
+				-RedirectStandardError (Join-Path $Out "ghostty-$run.log") -RedirectStandardOutput (Join-Path $Out "ghostty-$run.stdout")
 		}
 		'conhost' { $p = Start-Process -FilePath "$env:SystemRoot\System32\conhost.exe" -ArgumentList "`"$cat`" `"$data`" `"$result`"" -PassThru }
 		'windows-terminal' { $p = Start-Process -FilePath 'wt.exe' -ArgumentList "-w new `"$cat`" `"$data`" `"$result`"" -PassThru }
@@ -96,6 +99,11 @@ foreach ($t in $terms) {
 	$median = if ($sorted.Count) { $sorted[[int][math]::Floor($sorted.Count / 2)] } else { $null }
 	$records += [ordered]@{ terminal = $t; runs = $speeds; median_mb_s = $median }
 }
+# Ghostty's exit poll: a catch is a warning (in bench.json and the summary), never silent
+# (ci/exit-poll-scan.ps1). data.txt is above the scan's size limit; the logs are closed by now.
+. "$PSScriptRoot/exit-poll-scan.ps1"
+$pollHits = @(Get-ExitPollHits $Out)
+foreach ($w in $pollHits) { "warn $w" }
 $meta = [ordered]@{
 	machine = "$env:ImageOS $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)"
 	cpu = (Get-CimInstance Win32_Processor | Select-Object -First 1).Name
@@ -103,6 +111,7 @@ $meta = [ordered]@{
 	ghostty = (Split-Path $Zip -Leaf)
 	run = $env:GITHUB_RUN_ID
 	results = $records
+	exit_poll_warnings = $pollHits
 }
 $meta | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $Out 'bench.json') -Encoding utf8
 $table = @("| terminal | MB/s (median of $Runs) | runs |", '|---|---|---|')
@@ -112,6 +121,7 @@ if ($env:GITHUB_STEP_SUMMARY) {
 	"### Throughput: $SizeMB MB of coloured lines, $($meta.machine) ($($meta.cpu))`n" | Add-Content $env:GITHUB_STEP_SUMMARY -Encoding utf8
 	$table | Add-Content $env:GITHUB_STEP_SUMMARY -Encoding utf8
 	"`nA trend, not a claim: no GPU here (Ghostty draws with Mesa's software OpenGL), shared CPU." | Add-Content $env:GITHUB_STEP_SUMMARY -Encoding utf8
+	foreach ($w in $pollHits) { "`n- ⚠️ warn: $w" | Add-Content $env:GITHUB_STEP_SUMMARY -Encoding utf8 }
 }
 if (-not ($records | Where-Object { $null -ne $_.median_mb_s })) { exit 1 }
 exit 0

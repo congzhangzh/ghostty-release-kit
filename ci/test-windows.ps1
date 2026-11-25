@@ -529,8 +529,17 @@ $logLines = @(Get-Content $log -ErrorAction SilentlyContinue)
 Section "Ghostty's log (warnings, errors; $($logLines.Count) lines)"
 $logLines | Where-Object { $_ -match 'warn|err|fail|OpenGL|opengl|conpty|glcheck' } | Select-Object -First 60 | ForEach-Object { Add-Content -Path $results -Value "    $_" -Encoding utf8 }
 
+# Ghostty's exit poll: a catch is a warning in the results, never a silent PASS (lane A's poll,
+# 20261125.1; ci/exit-poll-scan.ps1). Every Ghostty above logs under $Out (ghostty.log, e2e\,
+# fonts\), and they are done by now.
+. "$PSScriptRoot/exit-poll-scan.ps1"
+$pollHits = @(Get-ExitPollHits $Out)
+Section "Ghostty's exit poll ($(if ($pollHits.Count) { "$($pollHits.Count) catch(es): a warning" } else { 'no catch' }))"
+foreach ($w in $pollHits) { Say 'warn' $w }
+if (-not $pollHits.Count) { Say 'info' 'exit poll: no catch (no "child process exit seen by the exit poll" line in any log)' }
+
 $secs = [int]((Get-Date) - $script:t0).TotalSeconds
-Add-Content -Path $results -Value "`n**$(if ($script:fails) { "FAIL ($($script:fails))" } else { 'PASS' })** in $secs s" -Encoding utf8
+Add-Content -Path $results -Value "`n**$(if ($script:fails) { "FAIL ($($script:fails))" } else { 'PASS' })**$(if ($pollHits.Count) { ", warn: exit poll caught $($pollHits.Count)" }) in $secs s" -Encoding utf8
 if ($env:GITHUB_STEP_SUMMARY) { Get-Content $results -Raw | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8 }
 # An explicit result: without it the step would end with the exit code of the last native
 # program the script ran (run 45188658814: the fonts step's bash, whose python failed, made a
