@@ -58,9 +58,11 @@ takes a `WM_QUIT` (whatever filter it is given).
 Cost: one GPU→CPU readback and one CPU copy per frame. That is fine at desktop sizes (🔎 not
 yet measured on real hardware) and is the reason for part 5.
 
-This readback path is the default (again since 20261124.8; Ghostty says "present: default
-readback" on stderr at start). `GHOSTTY_PRESENT` opts in to the GPU paths of part 5
-(`windows/dxgi.c`), which still have a stall under load and a hang on close:
+Since 20261125.1 the default is interop first: at start Ghostty probes OpenGL and picks
+`interop` where the driver has `WGL_NV_DX_interop2`, else `dxgi`; any failure falls back to this
+readback path, said once. It says which on stderr ("present: default interop (...)" or
+"present: default dxgi (...)"). `GHOSTTY_PRESENT=readback`, `dxgi` or `interop` picks one
+(`windows/dxgi.c`):
 
 - `dxgi`: the frame is still read back, then uploaded into a DXGI flip-model swap chain on the
   pane's window (2 buffers, BGRA8, a waitable latency object, at most one frame queued)

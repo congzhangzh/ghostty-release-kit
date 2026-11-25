@@ -59,7 +59,7 @@ upstream `main`, one commit per part (a part grows its own branch when it gets b
 | 2 | embedded | `GHOSTTY_PLATFORM_WINDOWS` (an `HWND`) and `ghostty_surface_take_frame` / `ghostty_frame_free` for a host that presents frames itself | done |
 | 3 | host | `windows/`: `ghostty.exe` in C on Win32: one window, one surface, the frame blitted on `WM_PAINT`, keys as scan codes with their text, IME text, mouse and wheel, resize, per-monitor DPI v2, clipboard with confirmations | done (now about 10,000 lines of C in 25 files); tested before every release under Wine and on GitHub's Windows virtual machines, x64 and Arm64 (see the kit below), and by hand on Windows 11 with an NVIDIA GPU (a hang on that driver fixed in 20261122.2) |
 | 4 | host UI | full screen (Ctrl+Enter, F11, `fullscreen = true`); tabs, splits, new window, the close confirmation, the IME candidate window position | full screen landed in 20261122.3, tabs and more than one window in 20261122.4, splits in 20261123.1 (dragging the divider in 20261123.2), the IME candidate list beside the composed text in 20261123.3; beyond the list: the Quick Terminal (20261123.4), the command palette (20261123.6), the cheat sheet (20261123.12); open: the close confirmation, the settings UI |
-| 5 | present | presentation through the GPU: a DXGI flip-model swap chain, then zero-copy (`WGL_NV_DX_interop2` sharing the frame with D3D11), so frames stop going through the CPU | in progress: the DXGI path landed in 20261123.11 and was the default until 20261124.7; since 20261124.8 the CPU readback is the default again and `GHOSTTY_PRESENT=dxgi` or `interop` opts in, while a stall under load and a hang on close are fixed. The DXGI path still reads the frame back and uploads it; the zero-copy step is not finished |
+| 5 | present | presentation through the GPU: a DXGI flip-model swap chain, then zero-copy (`WGL_NV_DX_interop2` sharing the frame with D3D11), so frames stop going through the CPU | landed: the DXGI path and the GPU blit into textures shared with D3D11 in 20261123.11; the default from then to 20261124.7, the CPU readback from 20261124.8 to 20261124.9 while a stall under load and a hang on close were found; since 20261125.1 the default again, interop first (where the driver has `WGL_NV_DX_interop2`), else `dxgi`, else the readback, and `GHOSTTY_PRESENT=readback`, `dxgi` or `interop` picks one. Interop still makes two GPU copies per frame, so zero-copy is not finished |
 | 6 | later | a D3D11 renderer (as Metal is to macOS), MSIX/winget packaging, code signing | open |
 
 Upstream had never run its Windows paths outside libghostty-vt, so the port also fixes them:
@@ -94,7 +94,7 @@ build for an unimportant push, decided by `ci/changes.sh`):
 - **OpenGL 4.3 on Windows on Arm and in VMs.** Native Arm64 drivers and Microsoft's GL-on-D3D12
   layer may report less than 4.3. Mesa's llvmpipe ships as the fallback (the `opengl` folder,
   since 20261123.1); native Arm64 drivers are still to be measured on real devices.
-- **CPU presentation cost** at high resolutions while the readback is the default (part 5).
+- **CPU presentation cost** at high resolutions where the readback is used: with no interop (`dxgi` still reads each frame back) or on request (part 5).
 - **Keyboard mapping**: Windows virtual keys and scan codes to Ghostty's key enum, dead keys,
   AltGr (which arrives as Ctrl+Alt), and the IME.
 - **ConPTY quirks**: its own VT rewriting, resize behavior, and the `conhost` version a system

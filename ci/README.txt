@@ -30,12 +30,12 @@ llvmpipe, see THIRD-PARTY-NOTICES.txt): it works everywhere, using the CPU. Keep
 folder beside ghostty.exe. GHOSTTY_GL=mesa or GHOSTTY_GL=system picks one; "ghostty.exe
 /stats" names the one in use. When neither works, Ghostty says why in a message box.
 
-Presenting frames: by default each frame goes to the window through a DXGI flip-model swap
-chain, and stays on the GPU (interop, no readback) where the OpenGL driver has
-WGL_NV_DX_interop2; if that fails, Ghostty falls back to copying it through the CPU and says so
-once. At start it says which on stderr: "present: default dxgi (...)" or "present: default
-interop (...)". GHOSTTY_PRESENT=readback picks the CPU copy (slower on large windows);
-GHOSTTY_PRESENT=dxgi or interop picks one of the others.
+Presenting frames: by default frames stay on the GPU (interop: OpenGL shares them with a DXGI
+flip-model swap chain, no copy through the CPU) where the graphics driver offers
+WGL_NV_DX_interop2; otherwise each frame is read back and shown through the DXGI swap chain;
+if that fails, Ghostty copies it to the window through the CPU (readback) and says so once. At
+start it says which on stderr: "present: default interop (...)" or "present: default dxgi
+(...)". GHOSTTY_PRESENT=readback, dxgi or interop picks one.
 
 Batch mode, for scripts and tests: set GHOSTTY_BATCH=1. Nothing opens by itself and nothing
 waits for a click: no What's new after an upgrade (it shows at the next normal start), no
