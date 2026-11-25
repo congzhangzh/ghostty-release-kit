@@ -103,6 +103,7 @@ jobs:
           MUST_BUILD: x86_64 aarch64
           WHATSNEW_TEXT: ${{ inputs.whatsnew }}
         run: |
+          sudo apt-get update -q > /dev/null
           sudo apt-get install -y -q zip p7zip-full > /dev/null
           kit/ci/build.sh ghostty "$VERSION" out x86_64 aarch64
 
@@ -830,7 +831,9 @@ jobs:
         with:
           name: demo-frames
           path: rec
-      - run: sudo apt-get install -y -q ffmpeg tesseract-ocr > /dev/null
+      - run: |
+          sudo apt-get update -q > /dev/null
+          sudo apt-get install -y -q ffmpeg tesseract-ocr > /dev/null
       - name: Every frame read for names and paths
         run: python3 -I -X utf8 ci/demo/privacy-check.py rec/frames rec/machine.txt | tee privacy.txt
       - name: The GIFs and the MP4

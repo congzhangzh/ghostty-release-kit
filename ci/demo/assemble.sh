@@ -31,6 +31,8 @@ for d in "$in"/*/; do
 	norm=$out/.norm-$scene
 	rm -rf "$norm" && mkdir -p "$norm"
 	fitted=0
+	# ffmpeg reads stdin (its keyboard commands) unless -nostdin: here stdin is the list, and each
+	# fitted frame ate bytes of the next lines ("duration" read as "ration", run 45638034138).
 	while IFS= read -r line; do
 		line=${line%$'\r'}
 		case $line in
@@ -38,7 +40,7 @@ for d in "$in"/*/; do
 			f=${line#file }
 			size=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$d/$f")
 			if [ "$size" != "$size0" ]; then
-				ffmpeg -v error -y -i "$d/$f" -vf "scale=$w0:$h0:force_original_aspect_ratio=decrease:flags=lanczos,pad=$w0:$h0:(ow-iw)/2:(oh-ih)/2:color=0x1d1f21" "$norm/$f"
+				ffmpeg -nostdin -v error -y -i "$d/$f" -vf "scale=$w0:$h0:force_original_aspect_ratio=decrease:flags=lanczos,pad=$w0:$h0:(ow-iw)/2:(oh-ih)/2:color=0x1d1f21" "$norm/$f"
 				fitted=$((fitted + 1))
 				echo "file '$norm/$f'"
 			else
