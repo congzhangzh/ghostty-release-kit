@@ -37,6 +37,12 @@ to the GPU paths; they still have known problems (a stall under load, a hang on 
 are being fixed. Without GHOSTTY_PRESENT, Ghostty says "present: default readback" on
 stderr at start.
 
+Batch mode, for scripts and tests: set GHOSTTY_BATCH=1. Nothing opens by itself and nothing
+waits for a click: no What's new after an upgrade (it shows at the next normal start), no
+hints; OpenGL errors and /buildinfo go to stderr; a clipboard read or write that would ask for
+confirmation is denied. Menus, About and What's new still work when clicked. The variable is
+not passed on to the shells inside.
+
 Full screen: F11 or Ctrl+Enter (the whole monitor, no frame, the taskbar hidden); press it
 again to go back. "fullscreen = true" in the config starts every window in full screen.
 
