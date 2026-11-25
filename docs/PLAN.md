@@ -2,7 +2,7 @@
 
 What each part of the port is and whether it has landed; kept current as parts land. Opened
 2026-11-21; parts 1 to 3 landed 2026-11-22 (the first release). Each part ships on its own
-release when it is ripe.
+release when it is ripe. Brought up to date on 2026-11-25, at release 20261124.9.
 
 ## Goal
 
@@ -57,9 +57,9 @@ upstream `main`, one commit per part (a part grows its own branch when it gets b
 |---|---|---|---|
 | 1 | WGL | A WGL backend for `renderer/opengl/Device.zig` and the context calls in `OpenGL.zig` (a hidden window's DC, `wglCreateContextAttribsARB` for 4.3 core, made current on the render thread); presentation stays on the CPU-pixel path | done |
 | 2 | embedded | `GHOSTTY_PLATFORM_WINDOWS` (an `HWND`) and `ghostty_surface_take_frame` / `ghostty_frame_free` for a host that presents frames itself | done |
-| 3 | host | `windows/`: `ghostty.exe` in C on Win32: one window, one surface, the frame blitted on `WM_PAINT`, keys as scan codes with their text, IME text, mouse and wheel, resize, per-monitor DPI v2, clipboard with confirmations | done; tested under Wine (window, typing, drawing, exit) before every release, and by hand on Windows 11 with an NVIDIA GPU (a hang on that driver fixed in 20261122.2) |
-| 4 | host UI | full screen (Ctrl+Enter, F11, `fullscreen = true`); tabs, splits, new window, the close confirmation, the IME candidate window position | full screen landed in 20261122.3, tabs and more than one window in 20261122.4; the rest open |
-| 5 | present | zero-copy presentation (`WGL_NV_DX_interop2` into a D3D11 flip swap chain, or a DirectComposition surface), so frames stop going through the CPU | later |
+| 3 | host | `windows/`: `ghostty.exe` in C on Win32: one window, one surface, the frame blitted on `WM_PAINT`, keys as scan codes with their text, IME text, mouse and wheel, resize, per-monitor DPI v2, clipboard with confirmations | done (now about 10,000 lines of C in 25 files); tested before every release under Wine and on GitHub's Windows virtual machines, x64 and Arm64 (see the kit below), and by hand on Windows 11 with an NVIDIA GPU (a hang on that driver fixed in 20261122.2) |
+| 4 | host UI | full screen (Ctrl+Enter, F11, `fullscreen = true`); tabs, splits, new window, the close confirmation, the IME candidate window position | full screen landed in 20261122.3, tabs and more than one window in 20261122.4, splits in 20261123.1 (dragging the divider in 20261123.2), the IME candidate list beside the composed text in 20261123.3; beyond the list: the Quick Terminal (20261123.4), the command palette (20261123.6), the cheat sheet (20261123.12); open: the close confirmation, the settings UI |
+| 5 | present | presentation through the GPU: a DXGI flip-model swap chain, then zero-copy (`WGL_NV_DX_interop2` sharing the frame with D3D11), so frames stop going through the CPU | in progress: the DXGI path landed in 20261123.11 and was the default until 20261124.7; since 20261124.8 the CPU readback is the default again and `GHOSTTY_PRESENT=dxgi` or `interop` opts in, while a stall under load and a hang on close are fixed. The DXGI path still reads the frame back and uploads it; the zero-copy step is not finished |
 | 6 | later | a D3D11 renderer (as Metal is to macOS), MSIX/winget packaging, code signing | open |
 
 Upstream had never run its Windows paths outside libghostty-vt, so the port also fixes them:
@@ -79,19 +79,22 @@ build for an unimportant push, decided by `ci/changes.sh`):
 2. Build: cross-compiled with Zig on Linux for `x86_64-windows-gnu` and `aarch64-windows-gnu`.
 3. Test the x64 build under Wine on a virtual X server, with OpenGL from Mesa's llvmpipe: the
    window appears, typed keys reach `cmd.exe` through ConPTY, the text is drawn, `exit` closes
-   it. Real Windows (a GPU driver, Arm64) is tried by hand on each release for now; Windows
-   runners in CI have no OpenGL 4.3 without shipping Mesa.
-4. On `main`, for the pin only, after every test passed: the rolling release, a zip per
-   architecture plus `SHA256SUMS`.
+   it.
+4. Test both builds on GitHub's Windows virtual machines (`windows-latest` for x64,
+   `windows-11-arm` for Arm64), with Mesa's llvmpipe, since they have no GPU driver; also the
+   setup, the PyPI wheels, a throughput bench and the feature demos. A GPU driver is still
+   tried by hand.
+5. On `main`, for the pin only, after the required tests passed: the rolling release, a zip and
+   a setup per architecture plus `SHA256SUMS`, and the wheels on PyPI.
 
 ## Risks and open questions
 
-- **Arm64 is built, not yet run.** Wine on x64 cannot run it; it needs a Windows on Arm
-  device.
+- **Arm64 runs on virtual machines only.** It passes the end-to-end and setup tests on GitHub's
+  Windows on Arm virtual machines; not yet tested on Arm hardware.
 - **OpenGL 4.3 on Windows on Arm and in VMs.** Native Arm64 drivers and Microsoft's GL-on-D3D12
-  layer may report less than 4.3. Ship Mesa llvmpipe as a fallback, lower the minimum, or move
-  to part 6 sooner? To be measured on real devices.
-- **CPU presentation cost** at high resolutions until part 5.
+  layer may report less than 4.3. Mesa's llvmpipe ships as the fallback (the `opengl` folder,
+  since 20261123.1); native Arm64 drivers are still to be measured on real devices.
+- **CPU presentation cost** at high resolutions while the readback is the default (part 5).
 - **Keyboard mapping**: Windows virtual keys and scan codes to Ghostty's key enum, dead keys,
   AltGr (which arrives as Ctrl+Alt), and the IME.
 - **ConPTY quirks**: its own VT rewriting, resize behavior, and the `conhost` version a system

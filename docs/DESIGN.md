@@ -7,8 +7,9 @@ from evidence, ⚠️ open or a guess.
 ## Layers
 
 ```
-ghostty.exe          windows/ghostty.c (668 lines of C, Win32)
-  │                  window, message loop, keys, text, mouse, clipboard, DPI, painting
+ghostty.exe          windows/*.c (about 10,000 lines of C in 25 files, Win32)
+  │                  window, message loop, keys, text, mouse, clipboard, DPI, painting,
+  │                  tabs, splits, menus, palette, presenting (paint.c, dxgi.c)
   │ include/ghostty.h (the C API, plus: GHOSTTY_PLATFORM_WINDOWS, ghostty_frame_s,
   │                    ghostty_surface_take_frame, ghostty_frame_free)
 libghostty           src/, app runtime "embedded", linked statically
@@ -57,6 +58,18 @@ takes a `WM_QUIT` (whatever filter it is given).
 Cost: one GPU→CPU readback and one CPU copy per frame. That is fine at desktop sizes (🔎 not
 yet measured on real hardware) and is the reason for part 5.
 
+This readback path is the default (again since 20261124.8; Ghostty says "present: default
+readback" on stderr at start). `GHOSTTY_PRESENT` opts in to the GPU paths of part 5
+(`windows/dxgi.c`), which still have a stall under load and a hang on close:
+
+- `dxgi`: the frame is still read back, then uploaded into a DXGI flip-model swap chain on the
+  pane's window (2 buffers, BGRA8, a waitable latency object, at most one frame queued)
+  instead of GDI. The D3D11 device is made on OpenGL's GPU: the adapter whose LUID OpenGL
+  reports, else the one of its vendor. Any failure falls back to GDI, said once.
+- `interop`: kept for the zero-copy step (OpenGL sharing its texture with D3D11 through
+  `WGL_NV_DX_interop2`); ⚠️ until that blit lands, its frames go through the `dxgi` path.
+  Without the extension (Wine, Mesa, the CI runners) it uses `SwapBuffers`.
+
 ## Input
 
 - **Keys:** `WM_KEYDOWN`/`WM_SYSKEYDOWN` are sent as the hardware scan code (`0xE000 | sc` for
@@ -103,11 +116,20 @@ sources.lock pin ─► ci/resolve.sh ─► ci/build.sh ───────�
                      ancestor)       + host via zig cc/c++; zip  render, exit       SHA256SUMS
 ```
 
-`ci/changes.sh` decides what a push needs: `none` (docs), `test` (scripts, the workflow), or
-`release` (a pin line, `ci/build.sh`, `ci/README.txt`). A manual run on `main` counts as
-`release`. The publish step refuses a version, or a kit-key of inputs, that is already released.
+Beside Wine, the `windows` job runs both builds on GitHub's Windows virtual machines
+(`windows-latest`, `windows-11-arm`) with `ci/test-windows.ps1`. They have no GPU driver, so
+Mesa's llvmpipe goes beside `ghostty.exe` when the in-box OpenGL is below 4.3 (as the zips carry
+it in their `opengl` folder); the checks look at the window's pixels (`PrintWindow`) and drive
+the real `ghostty.exe` through its test-control pipe. The `gate` job requires the
+build, `wine-x64` and `windows`; the tests run Ghostty with `GHOSTTY_BATCH=1`, so no window opens
+by itself and nothing waits for a click.
 
-Why Wine and not a Windows runner: hosted Windows runners have no OpenGL 4.3 without shipping
-Mesa. Wine with Mesa's llvmpipe gives GL 4.5–4.6 on any Linux runner, and its checks drive the
-real `ghostty.exe` through X (xdotool types, ImageMagick compares screenshots).
+`ci/changes.sh` decides what a push needs: `none` (docs), `test` (scripts, the workflow), or
+`release` (a pin line, `ci/build.sh`, `ci/about.py`, `ci/README.txt`, the notices, the setup
+script). A manual run on `main` counts as `release`. The publish step refuses a version, or a
+kit-key of inputs, that is already released.
+
+Why Wine too: it gives OpenGL 4.5–4.6 through Mesa's llvmpipe on any Linux runner, and its
+checks drive the real `ghostty.exe` through X (xdotool types, ImageMagick compares
+screenshots).
 
