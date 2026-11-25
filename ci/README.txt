@@ -32,10 +32,10 @@ folder beside ghostty.exe. GHOSTTY_GL=mesa or GHOSTTY_GL=system picks one; "ghos
 
 Presenting frames: by default each frame is copied to the window through the CPU (readback),
 the steadiest path today. GHOSTTY_PRESENT=dxgi (a DXGI flip-model swap chain) or
-GHOSTTY_PRESENT=interop (zero-copy, where the OpenGL driver has WGL_NV_DX_interop2) opts in
-to the GPU paths; they still have known problems (a stall under load, a hang on close) that
-are being fixed. Without GHOSTTY_PRESENT, Ghostty says "present: default readback" on
-stderr at start.
+GHOSTTY_PRESENT=interop (frames stay on the GPU, with no readback, where the OpenGL driver has
+WGL_NV_DX_interop2) opts in to the GPU paths; they still have known problems (a stall under
+load, a hang on close) that are being fixed. Without GHOSTTY_PRESENT, Ghostty says "present:
+default readback" on stderr at start.
 
 Batch mode, for scripts and tests: set GHOSTTY_BATCH=1. Nothing opens by itself and nothing
 waits for a click: no What's new after an upgrade (it shows at the next normal start), no
@@ -50,12 +50,13 @@ Tabs: Ctrl+Shift+T or the + on the tab bar opens one; Ctrl+Tab,
 Ctrl+PageUp/PageDown or Alt+1..9 switch; Ctrl+Shift+PageUp/PageDown move a tab; Ctrl+Shift+W,
 the x on a tab or a middle click closes it. Ctrl+Shift+N opens a new window.
 
-Tested before release (under Wine, see the release notes): the window, cmd.exe through
-ConPTY, typing, drawing, and closing when the shell exits.
-Written but first tried on real Windows with this build: PowerShell and WSL, IME input,
-mouse and wheel, copy and paste, per-monitor DPI. Please report what breaks.
-Not yet: splits, the settings UI. Frames are copied through the
-CPU, so very large windows use more CPU than they should.
+Tested before every release, under Wine and on Windows virtual machines (x64 and Arm64,
+without a GPU): the window, drawing, the shells through ConPTY, typing, fonts, tabs, themes,
+the title bar, notifications, About, and the prompt line through a split, a zoom and full
+screen (cmd, PowerShell 7, Windows PowerShell). Used by hand on Windows 11 with a GPU; not yet
+tested on Arm hardware. Please report what breaks.
+Not yet: the settings UI. By default frames are copied through the CPU, so very large
+windows use more CPU than they should.
 
 Ghostty for Windows opens a local stats pipe (\\.\pipe\ghostty-<pid>.stats) for your own tools:
 frame timings, CPU and memory, tab titles. Only processes of your own user on this machine can
@@ -76,7 +77,7 @@ To keep a log, start it from cmd.exe, which hands the file itself to ghostty:
 
 (Windows PowerShell's 2> puts a pipe in between, which can stall ghostty.exe.)
 
-It needs OpenGL 4.3, which any current GPU driver has. In a virtual machine without a GPU
-driver, put Mesa's opengl32.dll (llvmpipe) beside ghostty.exe.
+It needs OpenGL 4.3, which any current GPU driver has; without one, the opengl folder here
+gives it (see OpenGL above).
 
 Ghostty is MIT licensed (LICENSE).
