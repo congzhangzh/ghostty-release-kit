@@ -30,12 +30,12 @@ llvmpipe, see THIRD-PARTY-NOTICES.txt): it works everywhere, using the CPU. Keep
 folder beside ghostty.exe. GHOSTTY_GL=mesa or GHOSTTY_GL=system picks one; "ghostty.exe
 /stats" names the one in use. When neither works, Ghostty says why in a message box.
 
-Presenting frames: by default each frame is copied to the window through the CPU (readback),
-the steadiest path today. GHOSTTY_PRESENT=dxgi (a DXGI flip-model swap chain) or
-GHOSTTY_PRESENT=interop (frames stay on the GPU, with no readback, where the OpenGL driver has
-WGL_NV_DX_interop2) opts in to the GPU paths; they still have known problems (a stall under
-load, a hang on close) that are being fixed. Without GHOSTTY_PRESENT, Ghostty says "present:
-default readback" on stderr at start.
+Presenting frames: by default each frame goes to the window through a DXGI flip-model swap
+chain, and stays on the GPU (interop, no readback) where the OpenGL driver has
+WGL_NV_DX_interop2; if that fails, Ghostty falls back to copying it through the CPU and says so
+once. At start it says which on stderr: "present: default dxgi (...)" or "present: default
+interop (...)". GHOSTTY_PRESENT=readback picks the CPU copy (slower on large windows);
+GHOSTTY_PRESENT=dxgi or interop picks one of the others.
 
 Batch mode, for scripts and tests: set GHOSTTY_BATCH=1. Nothing opens by itself and nothing
 waits for a click: no What's new after an upgrade (it shows at the next normal start), no
@@ -55,8 +55,7 @@ without a GPU): the window, drawing, the shells through ConPTY, typing, fonts, t
 the title bar, notifications, About, and the prompt line through a split, a zoom and full
 screen (cmd, PowerShell 7, Windows PowerShell). Used by hand on Windows 11 with a GPU; not yet
 tested on Arm hardware. Please report what breaks.
-Not yet: the settings UI. By default frames are copied through the CPU, so very large
-windows use more CPU than they should.
+Not yet: the settings UI.
 
 Ghostty for Windows opens a local stats pipe (\\.\pipe\ghostty-<pid>.stats) for your own tools:
 frame timings, CPU and memory, tab titles. Only processes of your own user on this machine can

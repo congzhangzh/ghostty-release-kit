@@ -536,7 +536,7 @@ $logLines | Where-Object { $_ -match 'warn|err|fail|OpenGL|opengl|conpty|glcheck
 $pollHits = @(Get-ExitPollHits $Out)
 Section "Ghostty's exit poll ($(if ($pollHits.Count) { "$($pollHits.Count) catch(es): a warning" } else { 'no catch' }))"
 foreach ($w in $pollHits) { Say 'warn' $w }
-if (-not $pollHits.Count) { Say 'info' 'exit poll: no catch (no "child process exit seen by the exit poll" line in any log)' }
+if (-not $pollHits.Count) { Say 'info' 'exit poll: no catch in any log' }
 
 $secs = [int]((Get-Date) - $script:t0).TotalSeconds
 Add-Content -Path $results -Value "`n**$(if ($script:fails) { "FAIL ($($script:fails))" } else { 'PASS' })**$(if ($pollHits.Count) { ", warn: exit poll caught $($pollHits.Count)" }) in $secs s" -Encoding utf8
