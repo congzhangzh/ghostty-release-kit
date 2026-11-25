@@ -60,8 +60,8 @@ yet measured on real hardware) and is the reason for part 5.
 
 Since 20261125.1 the default is interop first: at start Ghostty probes OpenGL and picks
 `interop` where the driver has `WGL_NV_DX_interop2`, else `dxgi`; any failure falls back to this
-readback path, said once. It says which on stderr ("present: default interop (...)" or
-"present: default dxgi (...)"). `GHOSTTY_PRESENT=readback`, `dxgi` or `interop` picks one
+readback path, said once. It says which on stderr ("present: interop (default where
+available; ...)" or "present: dxgi (default: interop unavailable: <why>; ...)"). `GHOSTTY_PRESENT=readback`, `dxgi` or `interop` picks one
 (`windows/dxgi.c`):
 
 - `dxgi`: the frame is still read back, then uploaded into a DXGI flip-model swap chain on the

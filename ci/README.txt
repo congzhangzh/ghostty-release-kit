@@ -34,8 +34,9 @@ Presenting frames: by default frames stay on the GPU (interop: OpenGL shares the
 flip-model swap chain, no copy through the CPU) where the graphics driver offers
 WGL_NV_DX_interop2; otherwise each frame is read back and shown through the DXGI swap chain;
 if that fails, Ghostty copies it to the window through the CPU (readback) and says so once. At
-start it says which on stderr: "present: default interop (...)" or "present: default dxgi
-(...)". GHOSTTY_PRESENT=readback, dxgi or interop picks one.
+start it says which on stderr: "present: interop (default where available; ...)" or "present:
+dxgi (default: interop unavailable: <why>; ...)". GHOSTTY_PRESENT=readback, dxgi or interop
+picks one.
 
 Batch mode, for scripts and tests: set GHOSTTY_BATCH=1. Nothing opens by itself and nothing
 waits for a click: no What's new after an upgrade (it shows at the next normal start), no
