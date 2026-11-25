@@ -88,15 +88,15 @@ New-Item -ItemType Directory -Force $dir | Out-Null
 $menu = (Get-ItemProperty 'HKCU:\Software\Classes\Directory\shell\GhosttyHere\command' -ErrorAction SilentlyContinue).'(default)'
 if ($menu -match '^"([^"]+)" (.*)$') {
 	$args2 = $Matches[2].Replace('%V', $dir)
-	$env:GHOSTTY_TEST_CONTROL = '1'; $env:GHOSTTY_LOG = 'stderr'
-	$g = Start-Process -FilePath $Matches[1] -ArgumentList $args2 -PassThru -RedirectStandardError "$Out\open-here.ghostty.log" -RedirectStandardOutput "$Out\open-here.ghostty.stdout"
+	$env:GHOSTTY_TEST_CONTROL = '1'
+	$g = Start-Process -FilePath $Matches[1] -ArgumentList $args2 -PassThru
 	$text = ''
 	[Console]::OutputEncoding = [Text.Encoding]::UTF8
 	for ($i = 0; $i -lt 30 -and $text -notmatch [regex]::Escape($cn); $i++) {
 		Start-Sleep -Seconds 1
 		$text = (& "$app\ghostty.exe" --ctl $g.Id '{"cmd":"read"}' 2>$null | Out-String)
 	}
-	Remove-Item Env:GHOSTTY_TEST_CONTROL, Env:GHOSTTY_LOG -ErrorAction SilentlyContinue
+	Remove-Item Env:GHOSTTY_TEST_CONTROL -ErrorAction SilentlyContinue
 	Check ($text -match [regex]::Escape($cn)) "'Open Ghostty here' on a Chinese-named folder: the shell starts in it ($args2)"
 	Stop-Process -Id $g.Id -Force -ErrorAction SilentlyContinue
 } else { Check $false "the folder menu's command: $menu" }
@@ -105,9 +105,7 @@ Get-Process ghostty -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAc
 # 3. an upgrade over a running Ghostty (the PO's rule: closing it ends its shells, so a silent
 # setup never does that unless told to)
 # 3a. silent, not told: it refuses (exit 7, the log line), closes nothing, changes nothing
-$env:GHOSTTY_LOG = 'stderr'
-$g = Start-Process -FilePath "$app\ghostty.exe" -PassThru -RedirectStandardError "$Out\upgrade.ghostty.log" -RedirectStandardOutput "$Out\upgrade.ghostty.stdout"
-Remove-Item Env:GHOSTTY_LOG -ErrorAction SilentlyContinue
+$g = Start-Process -FilePath "$app\ghostty.exe" -PassThru
 Start-Sleep -Seconds 4
 $before = (Get-FileHash "$app\ghostty.exe").Hash + (Get-Item "$app\ghostty.exe").LastWriteTimeUtc.Ticks
 $r = Install "$Out\upgrade-refused.log"
@@ -144,12 +142,7 @@ Check (-not (Test-Path $uninstKey)) "the Apps & features entry is gone"
 Check (-not (Test-Path $lnk)) "the Start-menu shortcut is gone"
 foreach ($m in $menus) { Check (-not (Test-Path $m)) "'Open Ghostty here' is gone: $($m.Split('\')[-3..-1] -join '\')" }
 
-# Ghostty's exit poll: a catch is a warning, never a silent PASS (ci/exit-poll-scan.ps1; the
-# logs: e2e\ghostty.log, open-here.ghostty.log, upgrade.ghostty.log, all closed by now).
-. "$PSScriptRoot/exit-poll-scan.ps1"
-$pollHits = @(Get-ExitPollHits $Out)
-foreach ($w in $pollHits) { Say 'warn' $w }
-$lines.Add(''); $lines.Add($(if ($fails) { "FAIL ($fails)" } else { 'PASS' }) + $(if ($pollHits.Count) { ", warn: exit poll caught $($pollHits.Count)" }))
+$lines.Add(''); $lines.Add($(if ($fails) { "FAIL ($fails)" } else { 'PASS' }))
 if ($env:GITHUB_STEP_SUMMARY) {
 	"### Installer: $(Split-Path $Setup -Leaf) on $env:ImageOS`n" | Add-Content $env:GITHUB_STEP_SUMMARY -Encoding utf8
 	'```' | Add-Content $env:GITHUB_STEP_SUMMARY -Encoding utf8

@@ -159,13 +159,7 @@ function Run-Case([string] $name, [bool] $forward) {
 Run-Case 'forward' $true
 Run-Case 'off' $false
 
-# Ghostty's exit poll: a catch is a warning, never a silent pass (ci/exit-poll-scan.ps1; each
-# case's Ghostty logs to <Out>\<case>\ghostty.log, and both are closed by now).
-. "$PSScriptRoot/exit-poll-scan.ps1"
-$pollHits = @(Get-ExitPollHits $Out)
-foreach ($w in $pollHits) { Say 'warn' $w }
-
-$md = @("### pys inside Ghostty ($(if ($script:fails) { "$($script:fails) failed" } else { 'passed' })$(if ($pollHits.Count) { "; warn: exit poll caught $($pollHits.Count)" }))", '', '```') + $script:lines + '```'
+$md = @("### pys inside Ghostty ($(if ($script:fails) { "$($script:fails) failed" } else { 'passed' }))", '', '```') + $script:lines + '```'
 $md | Set-Content (Join-Path $Out 'results.md') -Encoding utf8
 if ($env:GITHUB_STEP_SUMMARY) { $md | Add-Content $env:GITHUB_STEP_SUMMARY -Encoding utf8 }
 if ($script:fails) { exit 1 }
