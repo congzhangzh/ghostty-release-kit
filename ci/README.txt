@@ -30,6 +30,13 @@ llvmpipe, see THIRD-PARTY-NOTICES.txt): it works everywhere, using the CPU. Keep
 folder beside ghostty.exe. GHOSTTY_GL=mesa or GHOSTTY_GL=system picks one; "ghostty.exe
 /stats" names the one in use. When neither works, Ghostty says why in a message box.
 
+Presenting frames: by default each frame is copied to the window through the CPU (readback),
+the steadiest path today. GHOSTTY_PRESENT=dxgi (a DXGI flip-model swap chain) or
+GHOSTTY_PRESENT=interop (zero-copy, where the OpenGL driver has WGL_NV_DX_interop2) opts in
+to the GPU paths; they still have known problems (a stall under load, a hang on close) that
+are being fixed. Without GHOSTTY_PRESENT, Ghostty says "present: default readback" on
+stderr at start.
+
 Full screen: F11 or Ctrl+Enter (the whole monitor, no frame, the taskbar hidden); press it
 again to go back. "fullscreen = true" in the config starts every window in full screen.
 
