@@ -408,31 +408,6 @@ jobs:
         with:
           name: installers
           path: out/installers
-      # The feature demos (ci/demo/): only a set a person has looked at, frame by frame. The
-      # repository variable DEMOS_OK names the run whose demos were approved after that look (its
-      # OCR check passed too, or the artifact would not exist); they are taken from that run.
-      # Unset, or that run's artifact gone: the release goes out without demos. A run's own demos
-      # are never published on its automatic check alone (run 45298827734: the check passed
-      # frames the look refused).
-      - name: The approved demos (vars.DEMOS_OK)
-        if: vars.DEMOS_OK != ''
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DEMOS_OK: ${{ vars.DEMOS_OK }}
-          # The families that passed the look, e.g. "workspace look commands"; unset = all of them.
-          # With a list, only those GIFs ship, and demo-all.mp4 (every scene) never does.
-          DEMOS_FAMILIES: ${{ vars.DEMOS_FAMILIES }}
-        run: |
-          gh run download "$DEMOS_OK" -R "$GITHUB_REPOSITORY" -n demos -D out/demos
-          if [ -n "$DEMOS_FAMILIES" ]; then
-            rm -f out/demos/demo-all.mp4
-            for f in out/demos/demo-*.gif; do
-              fam=$(basename "$f" .gif); fam=${fam#demo-}; fam=${fam#[0-9]-}
-              case " $DEMOS_FAMILIES " in *" $fam "*) ;; *) rm -f "$f" ;; esac
-            done
-          fi
-          ls -l out/demos
       - name: Publish the rolling release
         id: release
         env:
@@ -482,11 +457,10 @@ jobs:
           } > out/notes.md
           cat out/notes.md
           setups=$(ls out/installers/*-setup.exe 2> /dev/null || true)
-          demos=$(ls out/demos/demo-*.gif out/demos/demo-all.mp4 2> /dev/null || true)
           if [ -n "$setups" ]; then (cd out/installers && sha256sum -- *-setup.exe) >> out/SHA256SUMS; fi
           # shellcheck disable=SC2086 # one word per installer
           KEY=$key python3 -I kit/ci/publish-release.py "$tag" "$GITHUB_SHA" \
-            "Ghostty for Windows $tag" out/notes.md out/*.zip $setups $demos out/SHA256SUMS
+            "Ghostty for Windows $tag" out/notes.md out/*.zip $setups out/SHA256SUMS
 
   # ghostty-for-windows on PyPI (pypi/): the launcher package, repacked into one wheel per
   # architecture with the build's whole zip inside (pypi/bundle.py). Its version is the
@@ -738,8 +712,8 @@ jobs:
 
   # The feature demos, one GIF per family (ci/demo/scenes/<n>-<family>.scene) and one MP4: recorded
   # on a GitHub runner (never anyone's desktop) through the test pipe by demo.exe, then read
-  # frame by frame for names and paths (ci/demo/privacy-check.py). Publishing takes only a set a
-  # person approved after looking at every frame (vars.DEMOS_OK, the approved run). Never a gate.
+  # frame by frame for names and paths (ci/demo/privacy-check.py). publish-demos adds them to the
+  # run's release; the frames are looked at after. Never a gate.
   # pys (py-screen) inside Ghostty on real Windows: a background pys window's notification and
   # progress reach Ghostty's tab (pys's FORWARD_NOTIFY), and not with FORWARD_NOTIFY = False.
   # Reported, not required (not in the gate): pys is its own project, pinned here by commit.
@@ -848,3 +822,25 @@ jobs:
         with:
           name: demos
           path: demos/
+
+  # The release's own demos, added to it once both are done (2026-11-25: every release records its
+  # own; a privacy problem in them deletes the release; good ones go into the README). The release
+  # never waits for them; demo-assemble's OCR check (privacy-check.py) must pass or there
+  # is no artifact. The frames are then looked at: a privacy problem deletes the release; good
+  # demos go into README.md (pointed at this tag) by hand.
+  publish-demos:
+    needs: [publish, demo-assemble]
+    if: always() && needs.publish.result == 'success' && needs.publish.outputs.tag != '' && needs.demo-assemble.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: demos
+          path: demos
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.publish.outputs.tag }}
+        run: |
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" demos/demo-*.gif demos/demo-all.mp4
+          echo "### Demos added to $TAG" >> "$GITHUB_STEP_SUMMARY"
