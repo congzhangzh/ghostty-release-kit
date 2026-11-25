@@ -14,7 +14,7 @@
 # Writes <out dir>/test.log and the screenshots; runs every step, exits 1 if any failed.
 set -u
 exe=$1 out=$2; mkdir -p "$out"; out=$(cd "$out" && pwd); here=$(cd "$(dirname "$0")" && pwd)
-unset GHOSTTY_WHATSNEW # step 1 needs the default: What's new opens in a fresh profile
+unset GHOSTTY_WHATSNEW GHOSTTY_BATCH # step 1 needs the default: What's new opens in a fresh profile (run-all.sh exports batch mode)
 sendcmd=${WINE_HELPERS:-$here/bin}/sendcmd.exe
 log=$out/test.log; : > "$log"
 say() { echo "$*" | tee -a "$log"; }

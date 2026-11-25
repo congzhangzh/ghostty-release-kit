@@ -42,7 +42,9 @@ $RUN "$exe" > "$out/ghostty.log" 2>&1 & pid=$!
 for _ in $(seq 60); do sleep 1; ctl '{"cmd":"hello"}' | grep -q '"ok":true' && break; done; sleep 4
 p1=$(panes | awk '{print $1}')
 echo "#    integration injected: $(grep -c 'shell integration automatically injected' "$out/ghostty.log") (mode $mode, shell-integration $integ, command ${shellcmd:-default})"
-ctl '{"cmd":"text","text":"echo keep-me-typed"}' > /dev/null; sleep 2
+ctl '{"cmd":"text","text":"echo keep-me-typed"}' > /dev/null
+# Up to 10 s: a slow shell start (Windows PowerShell 5.1 on the Arm runner) shows the typed text late.
+for _ in $(seq 10); do sleep 1; [ "$(held 1)" = 1 ] && break; done
 fact "1. the typed command shows" "$(held 1)" 1
 ctl '{"cmd":"action","action":"new_split:down","pane":'"$p1"'}' > /dev/null; sleep 4
 fact "2. after a split down, the first pane keeps it" "$(held 2)" 1
