@@ -11,8 +11,13 @@
 set -uo pipefail
 dir=${1:?usage: exit-poll-flag.sh <results dir> <label>} label=${2:-$1}
 [ -d "$dir" ] || { echo "exit-poll-flag: no $dir"; exit 0; }
-lines=$(grep -r -a -l -F 'child process exit seen by the exit poll' "$dir" 2> /dev/null || true)
-counts=$(grep -r -a -o -E '"?exit_poll_catches"?[[:space:]]*[:=][[:space:]]*[1-9][0-9]*' "$dir" 2> /dev/null || true)
+# Not in binaries: the line is a string literal in ghostty.exe itself, and test-windows.ps1,
+# test-pys.ps1 and bench-throughput.ps1 unpack the package under their results dir (<dir>/pkg),
+# so a plain grep -r -a would flag every run of a build that has the poll.
+skip=(--exclude-dir=pkg --exclude='*.exe' --exclude='*.dll' --exclude='*.pdb' --exclude='*.zip'
+	--exclude='*.png' --exclude='*.bmp' --exclude='*.gif' --exclude='*.mp4')
+lines=$(grep -r -a -l -F "${skip[@]}" 'child process exit seen by the exit poll' "$dir" 2> /dev/null || true)
+counts=$(grep -r -a -o -E "${skip[@]}" '"?exit_poll_catches"?[[:space:]]*[:=][[:space:]]*[1-9][0-9]*' "$dir" 2> /dev/null || true)
 n=$(printf '%s\n' "$lines" | grep -c . || true)
 if [ -z "$lines$counts" ]; then
 	msg="exit poll: no catch in $label"
