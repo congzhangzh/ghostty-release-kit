@@ -66,9 +66,13 @@ readback" on stderr at start). `GHOSTTY_PRESENT` opts in to the GPU paths of par
   pane's window (2 buffers, BGRA8, a waitable latency object, at most one frame queued)
   instead of GDI. The D3D11 device is made on OpenGL's GPU: the adapter whose LUID OpenGL
   reports, else the one of its vendor. Any failure falls back to GDI, said once.
-- `interop`: kept for the zero-copy step (OpenGL sharing its texture with D3D11 through
-  `WGL_NV_DX_interop2`); ⚠️ until that blit lands, its frames go through the `dxgi` path.
-  Without the extension (Wine, Mesa, the CI runners) it uses `SwapBuffers`.
+- `interop` (where the driver has `WGL_NV_DX_interop2`): frames stay on the GPU, with no
+  readback. The renderer locks one of two D3D11 textures shared with the host, blits its
+  framebuffer into it and unlocks it (`src/renderer/OpenGL.zig`, `dxPresent`, since
+  20261123.11); the host copies that texture into the swap chain's back buffer and presents it
+  (`dxgi_present_shared`). That is two GPU copies per frame, so not yet zero-copy, and ⚠️ not
+  yet faster than the readback on a real GPU. Without the extension (Wine, Mesa, the CI
+  runners) it uses `SwapBuffers`.
 
 ## Input
 
