@@ -78,7 +78,7 @@ function Run-Case([string] $name, [bool] $forward) {
 	$env:PYS_CONFIG = Join-Path $dir 'config.py'
 	Set-Content $env:PYS_CONFIG $(if ($forward) { '# defaults: FORWARD_NOTIFY = True' } else { 'FORWARD_NOTIFY = False' }) -Encoding utf8
 	$env:GHOSTTY_TEST_CONTROL = '1'
-	$env:GHOSTTY_WHATSNEW = 'off'
+	$env:GHOSTTY_WHATSNEW = 'off'; $env:GHOSTTY_BATCH = '1'
 	$env:GHOSTTY_LOG = 'stderr'
 	$p = Start-Process -FilePath $ghostty -ArgumentList "`"--command=$pys`"" -PassThru `
 		-RedirectStandardError (Join-Path $dir 'ghostty.log')

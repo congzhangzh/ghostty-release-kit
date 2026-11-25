@@ -21,7 +21,7 @@ export WINEPREFIX=${WINEPREFIX:-$out/wineprefix} WINEDEBUG=${WINEDEBUG:-err+all,
 export GHOSTTY_LOG=${GHOSTTY_LOG:-stderr}
 # What's new opens by itself once after an upgrade when the build has notes (a release): it
 # would cover the window this test types into. Off here, as for every test.
-export GHOSTTY_WHATSNEW=off
+export GHOSTTY_WHATSNEW=off GHOSTTY_BATCH=1
 
 say() { echo "$*" | tee -a "$log"; }
 fail() { say "FAIL $*"; cleanup; exit 1; }

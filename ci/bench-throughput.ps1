@@ -56,7 +56,7 @@ function Run-One([string] $name, [int] $run) {
 	$before = @(Get-Process -ErrorAction SilentlyContinue | ForEach-Object Id)
 	switch ($name) {
 		'ghostty' {
-			$env:GHOSTTY_WHATSNEW = 'off'
+			$env:GHOSTTY_WHATSNEW = 'off'; $env:GHOSTTY_BATCH = '1'
 			# One argument: Start-Process joins its list unquoted, so "--command=a b c" must carry its
 			# own quotes or Ghostty gets --command=a and two stray arguments (run 45204591235: no
 			# Ghostty result on either arch, catbench ran without its file).

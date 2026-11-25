@@ -12,7 +12,7 @@
 set -u
 exe=$1 res=$2 out=$3 mode=${4:-readback} integ=${5:-detect} shellcmd=${6:-}; mkdir -p "$out"; out=$(cd "$out" && pwd)
 RUN=${RUN-wine} PY=${PY:-python3}
-export GHOSTTY_PRESENT=$mode GHOSTTY_WHATSNEW=off GHOSTTY_TEST_CONTROL=1 GHOSTTY_LOG=stderr
+export GHOSTTY_PRESENT=$mode GHOSTTY_WHATSNEW=off GHOSTTY_BATCH=1 GHOSTTY_TEST_CONTROL=1 GHOSTTY_LOG=stderr
 if [ "$RUN" = wine ]; then
 	export WINEPREFIX=$out/wineprefix WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml="
 	[ -d "$WINEPREFIX" ] || wineboot -i > "$out/wineboot.log" 2>&1

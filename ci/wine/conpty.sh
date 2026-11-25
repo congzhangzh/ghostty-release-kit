@@ -12,7 +12,7 @@
 #             (its console driver lacks what OpenConsole.exe needs) and the in-box one takes over
 # Run inside xvfb-run. Writes <out>/test.log; runs every case, exits 1 if any failed.
 set -u
-export GHOSTTY_WHATSNEW=off # What's new opens once after an upgrade, and every prefix here is new
+export GHOSTTY_WHATSNEW=off GHOSTTY_BATCH=1 # What's new opens once after an upgrade, and every prefix here is new
 pkg=$(cd "$1" && pwd) out=$2
 mkdir -p "$out"
 out=$(cd "$out" && pwd)

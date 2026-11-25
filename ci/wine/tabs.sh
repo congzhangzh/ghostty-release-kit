@@ -12,7 +12,7 @@
 #   5. `exit` in each tab closes that tab only; the last one ends ghostty.exe.
 # Writes <out dir>/test.log and a screenshot per step; runs every step, exits 1 if any failed.
 set -u
-export GHOSTTY_WHATSNEW=off # What's new opens once after an upgrade, and every prefix here is new
+export GHOSTTY_WHATSNEW=off GHOSTTY_BATCH=1 # What's new opens once after an upgrade, and every prefix here is new
 exe=$1 out=$2; mkdir -p "$out"; out=$(cd "$out" && pwd)
 log=$out/test.log; : > "$log"
 say() { echo "$*" | tee -a "$log"; }

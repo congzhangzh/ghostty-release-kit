@@ -9,7 +9,7 @@
 # theme's background, the log says "found Ghostty resources dir" and does not say "no resources
 # dir set" or "not found". Run inside xvfb-run. Writes <out>/test.log, <out>/window.png, <out>/ghostty.log.
 set -u
-export GHOSTTY_WHATSNEW=off # What's new opens once after an upgrade, and every prefix here is new
+export GHOSTTY_WHATSNEW=off GHOSTTY_BATCH=1 # What's new opens once after an upgrade, and every prefix here is new
 pkg=$1 out=$2 theme=${3:-Dracula} want=${4:-282a36}; want=${want,,}
 mkdir -p "$out"
 out=$(cd "$out" && pwd)

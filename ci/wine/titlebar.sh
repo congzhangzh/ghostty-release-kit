@@ -21,7 +21,7 @@ ht=$helpers/hittest.exe; nc() { wine "$helpers/ncsend.exe" "$1" > /dev/null 2>&1
 log=$out/test.log; : > "$log"
 say() { echo "$*" | tee -a "$log"; }
 for h in hittest ncsend; do [ -f "$helpers/$h.exe" ] || { say "FAIL no $helpers/$h.exe: run build-helpers.sh"; exit 1; }; done
-export WINEPREFIX=$out/wineprefix WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml=" GHOSTTY_TITLEBAR=tabs GHOSTTY_WHATSNEW=off
+export WINEPREFIX=$out/wineprefix WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml=" GHOSTTY_TITLEBAR=tabs GHOSTTY_WHATSNEW=off GHOSTTY_BATCH=1
 [ -d "$WINEPREFIX" ] || wineboot -i > "$out/wineboot.log" 2>&1
 wine reg add "HKCU\\Software\\Wine\\X11 Driver" /v Decorated /t REG_SZ /d N /f > /dev/null 2>&1
 fails=0

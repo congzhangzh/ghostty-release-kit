@@ -51,7 +51,7 @@ fi
 export WINE_HELPERS
 # What's new opens once after an upgrade when the build has notes, in every fresh prefix: it would
 # take the typing. Off for every test; about.sh unsets it itself, as it tests that box.
-export GHOSTTY_WHATSNEW=off
+export GHOSTTY_WHATSNEW=off GHOSTTY_BATCH=1
 
 summary=$out/summary.md
 results=()

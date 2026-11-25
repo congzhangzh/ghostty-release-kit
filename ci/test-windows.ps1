@@ -343,7 +343,7 @@ if (Test-Path "$pkg\opengl\opengl32.dll") {
 }
 Copy-Item "$Probes\emit.exe" $pkg
 $log = Join-Path $Out 'ghostty.log'
-$env:GHOSTTY_LOG = 'stderr'; $env:GHOSTTY_WHATSNEW = 'off'
+$env:GHOSTTY_LOG = 'stderr'; $env:GHOSTTY_WHATSNEW = 'off'; $env:GHOSTTY_BATCH = '1'
 $started = Get-Date
 $g = Start-Process -FilePath $exe.FullName -WorkingDirectory $pkg -PassThru -RedirectStandardError $log -RedirectStandardOutput "$log.stdout"
 $hwnd = [IntPtr]::Zero

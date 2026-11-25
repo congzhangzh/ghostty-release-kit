@@ -16,7 +16,7 @@
 # what was asked and its result. Run inside xvfb-run. Writes <out>/test.log; runs every step,
 # exits 1 if any failed.
 set -u
-export GHOSTTY_WHATSNEW=off GHOSTTY_LOG=stderr
+export GHOSTTY_WHATSNEW=off GHOSTTY_BATCH=1 GHOSTTY_LOG=stderr
 exe=$1 out=$2
 mkdir -p "$out"
 out=$(cd "$out" && pwd)
