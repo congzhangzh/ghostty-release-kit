@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# The default shell under Wine, with no `command` in the config:
+# The default shell under Wine, with no `command` in the config: always cmd.exe, as upstream
+# (since 20261126.1; PowerShell is chosen in the Shell menu or with `command =`):
 #
 #   ci/wine/shell.sh <package dir: ghostty.exe [+ share/]> <out dir>
 #
-#   a. none   no pwsh.exe anywhere: cmd.exe, and the log gives the Wine reason (Wine's
-#             powershell.exe is a stub, so it is skipped)
-#   b. path   a fake pwsh.exe in C:\fakebin, put on PATH with WINEPATH: it runs
-#   c. pf     a fake pwsh.exe in C:\Program Files\PowerShell\7 (a path with a space): it runs
+#   a. none   no pwsh.exe anywhere: cmd.exe
+#   b. path   a fake pwsh.exe in C:\fakebin, put on PATH with WINEPATH: NOT run, cmd.exe
+#   c. pf     a fake pwsh.exe in C:\Program Files\PowerShell\7: NOT run, cmd.exe
 # The fake ($WINE_HELPERS/pwsh.exe, from helpers/fakepwsh.c; build-helpers.sh) writes
 # C:\fake-pwsh-ran.txt with its own path, then runs cmd.exe.
 # Each case gets a fresh Wine prefix. Run inside xvfb-run. Writes <out>/test.log.
@@ -38,7 +38,7 @@ run() {
 	kill -0 "$pid" 2> /dev/null && alive=yes || alive=no
 	kill "$pid" 2> /dev/null
 	wineserver -k 2> /dev/null
-	shell_line=$(grep -o 'default shell src=detect value=.*' "$out/$c/ghostty.log" | head -1)
+	shell_line=$(grep -o 'will default to using cmd' "$out/$c/ghostty.log" | head -1)
 	say "#    $c: window ${wid:-none}, still running after 8 s: $alive"
 	say "#    $c: log: ${shell_line:-<no default shell line>}"
 }
@@ -65,22 +65,8 @@ for c in none path pf; do
 	esac
 	run "$c"
 	marker=$(tr -d '\r' < "$c_drive/fake-pwsh-ran.txt" 2> /dev/null)
-	case $c in
-	none)
-		check none "cmd.exe, skipping Wine's stub powershell.exe" \
-			grep -q 'value=cmd.exe (no PowerShell 7; running under Wine, whose powershell.exe is a stub)' "$out/none/ghostty.log"
-		check none "the shell stays up (no window closed at once)" [ "$alive" = yes ]
-		;;
-	path)
-		check path "the log names C:\\fakebin\\pwsh.exe, on PATH" \
-			grep -qi 'value=C:\\fakebin\\pwsh.exe (PowerShell 7, pwsh.exe on PATH)' "$out/path/ghostty.log"
-		check path "the fake pwsh.exe ran ($marker)" [ -n "$marker" ]
-		;;
-	pf)
-		check pf "the log names C:\\Program Files\\PowerShell\\7\\pwsh.exe" \
-			grep -qi 'value=C:\\Program Files\\PowerShell\\7\\pwsh.exe (PowerShell 7, in its install folder)' "$out/pf/ghostty.log"
-		check pf "the fake pwsh.exe ran from the path with a space ($marker)" [ -n "$marker" ]
-		;;
-	esac
+	check "$c" "cmd.exe is the default (the log says so)" grep -q 'will default to using cmd' "$out/$c/ghostty.log"
+	check "$c" "the shell stays up (no window closed at once)" [ "$alive" = yes ]
+	[ "$c" = none ] || check "$c" "the fake pwsh.exe did not run" [ -z "$marker" ]
 done
 [ $fails = 0 ] && say PASS || { say "FAIL ($fails)"; exit 1; }

@@ -327,6 +327,12 @@
 #   - Feature demos: the demo step builds again (it stopped at the package install, then at a
 #   scene whose frames change size); run as the job does on 20261125.2's frames.
 #   - Known: as in 20261125.2.
+#   r20261126.1: The default shell is Command Prompt (cmd.exe) again, as in upstream Ghostty.
+#   - Changed: with no `command` in the config, new tabs, splits and windows run cmd.exe. To use
+#   PowerShell, choose it in the window menu (Alt+Space, Shell) or set `command = pwsh.exe`.
+#   - Tested: the default shell under Wine (cmd.exe, and a pwsh.exe on PATH or in Program Files is
+#   not run); the end-to-end tests on Windows take either shell.
+#   - Known: as in 20261125.2.
 # conpty: Microsoft's console host for pseudoconsoles (conpty.dll + OpenConsole.exe, MIT), the
 #   NuGet package Microsoft.Windows.Console.ConPTY; the commit column is the package's SHA-256.
 #   ci/build.sh puts both files, unmodified, beside ghostty.exe when the source side-loads them
@@ -343,7 +349,7 @@
 #   branch, so a test build of another commit finds its own base on it.
 #
 # name          version                url                                                                commit
-ghostty         1.4.1-dev+r20261125.3  git+https://github.com/congzhangzh/ghostty.git#release-20261125.3  11618ef947046f98f20a896be32285496c6b0576
+ghostty         1.4.1-dev+r20261126.1  git+https://github.com/congzhangzh/ghostty.git#release-20261126.1  62143bb60598a5618ec8b31ae3265f51ef452381
 ghostty-base    main                   git+https://github.com/ghostty-org/ghostty.git#main                11ed660d99fd0dd8dadcaf456db31b71f0f21beb
 conpty          1.25.261109001         https://www.nuget.org/api/v2/package/Microsoft.Windows.Console.ConPTY/1.25.261109001  sha256:3d77f535df848e44225c2a8912ac844fecb23f3057732b639f3034b587496f09
 py-screen       0.1.0                  git+https://github.com/congzhangzh/py-screen.git                    f42a2cdedf6cf25c6941588e331e5e58755912ec

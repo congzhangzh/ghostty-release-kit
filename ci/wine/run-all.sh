@@ -11,7 +11,7 @@
 #   tabs       new tab, switching, the + button, Alt+N, closing tabs
 #   theme      the resources dir is found: a theme's background is drawn
 #   statsipc   the stats pipe and `ghostty.exe /stats`, with a stuck reader and with it off
-#   shell      the default shell: cmd.exe, or pwsh.exe on PATH or in Program Files
+#   shell      the default shell: cmd.exe, even with pwsh.exe on PATH or in Program Files
 #   titlebar   the caption buttons (hit tests, clicks, maximized) and the window menu
 #   conpty     in-box ConPTY vs the side-loaded conpty.dll + OpenConsole.exe (runs test-wine 4 times)
 #   notify     desktop notifications and taskbar progress from OSC 9 / 777
