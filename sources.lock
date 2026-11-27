@@ -333,6 +333,12 @@
 #   - Tested: the default shell under Wine (cmd.exe, and a pwsh.exe on PATH or in Program Files is
 #   not run); the end-to-end tests on Windows take either shell.
 #   - Known: as in 20261125.2.
+#   r20261126.2: The window keeps answering the keyboard and mouse under heavy output.
+#   - Fixed: during a heavy benchmark the window could stop taking input and Windows showed it as
+#   "Not Responding" while it kept drawing; the loop now reads input before each next update.
+#   - Tested on this release's source: it builds for x64 and Arm64; the release run's Wine and
+#   Windows tests. The heavy-benchmark case itself is to be confirmed by a tester.
+#   - Known: as in 20261125.2.
 # conpty: Microsoft's console host for pseudoconsoles (conpty.dll + OpenConsole.exe, MIT), the
 #   NuGet package Microsoft.Windows.Console.ConPTY; the commit column is the package's SHA-256.
 #   ci/build.sh puts both files, unmodified, beside ghostty.exe when the source side-loads them
@@ -349,7 +355,7 @@
 #   branch, so a test build of another commit finds its own base on it.
 #
 # name          version                url                                                                commit
-ghostty         1.4.1-dev+r20261126.1  git+https://github.com/congzhangzh/ghostty.git#release-20261126.1  62143bb60598a5618ec8b31ae3265f51ef452381
+ghostty         1.4.1-dev+r20261126.2  git+https://github.com/congzhangzh/ghostty.git#release-20261126.2  0552d91dc3d3d25c4318314337b5b707385dedaa
 ghostty-base    main                   git+https://github.com/ghostty-org/ghostty.git#main                11ed660d99fd0dd8dadcaf456db31b71f0f21beb
 conpty          1.25.261109001         https://www.nuget.org/api/v2/package/Microsoft.Windows.Console.ConPTY/1.25.261109001  sha256:3d77f535df848e44225c2a8912ac844fecb23f3057732b639f3034b587496f09
 py-screen       0.1.0                  git+https://github.com/congzhangzh/py-screen.git                    f42a2cdedf6cf25c6941588e331e5e58755912ec
